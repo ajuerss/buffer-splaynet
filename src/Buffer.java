@@ -4,26 +4,30 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class Buffer {
-    SplayNet usedNet;
-    int bufferSize;
-    List<BufferNodePair> listBufferNodePairs = new ArrayList<>();
+    private final SplayNet usedNet;
+    private final int bufferSize;
+    private List<BufferNodePair> listBufferNodePairs = new ArrayList<>();
+
+    public List<BufferNodePair> getListBufferNodePairs(){return this.listBufferNodePairs;}
+
+    public void addListBufferNodePairs(BufferNodePair element){this.listBufferNodePairs.add(element);}
+
+    public void removeListBufferNodePairs(int x){ this.listBufferNodePairs.remove(x);}
 
     public Buffer (SplayNet inputNet, int bufferSize){
         this.usedNet = inputNet;
         this.bufferSize = bufferSize;
     }
 
-    public boolean isFull(){
-        if (listBufferNodePairs == null){
-            return false;
-        }
-        return listBufferNodePairs.size() >= bufferSize;
+    public boolean isSpace(){
+        if (listBufferNodePairs == null) return true;
+        return listBufferNodePairs.size() < bufferSize;
     }
 
     public static class BufferNodePair{
         SplayNet.CommunicatingNodes nodePair;
-        int priority;
-        int timestamp;
+        private int priority;
+        private int timestamp;
 
         public BufferNodePair(SplayNet.CommunicatingNodes commNodes){
             this.nodePair = commNodes;
@@ -33,21 +37,23 @@ public class Buffer {
         public int getPriority() {
             return this.priority;
         }
+        public void setPriority(int k) { this.priority = k; }
+        public int getTimestamp() {
+            return this.timestamp;
+        }
+        public void setTimestamp(int k) { this.timestamp = k; }
 
     }
     public void increaseTimestamp(){
-        if (listBufferNodePairs == null){
-            return;
-        }
+        if (listBufferNodePairs == null) return;
         for (BufferNodePair element: listBufferNodePairs){
             element.timestamp++;
         }
     }
 
-
     public void calcPriority(){
         for (BufferNodePair element: listBufferNodePairs){
-            element.priority = usedNet.cost(element.nodePair.u, element.nodePair.v) - element.timestamp;
+            element.priority = usedNet.cost(element.nodePair.getU(), element.nodePair.getV()) - element.timestamp;
         }
     }
 

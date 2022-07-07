@@ -10,12 +10,15 @@ public class CSVReader {
         List<SplayNet.CommunicatingNodes> ListOfCommNode = new ArrayList<>();
         String line = "";
         BufferedReader br = new BufferedReader(new FileReader(path));
-        while ((line = br.readLine()) != null){
+        int count = 0;
+        int maxCount = 10000000;
+        while ((line = br.readLine()) != null && count < maxCount){
             String[] values = line.replaceAll("\"", "").split(",");
             int u = Integer.parseInt(values[1]);
             int v = Integer.parseInt(values[2]);
             SplayNet.CommunicatingNodes pair = new SplayNet.CommunicatingNodes(Integer.parseInt(values[0]), u, v);
             ListOfCommNode.add(pair);
+            count++;
         }
         return ListOfCommNode;
     }
@@ -23,12 +26,8 @@ public class CSVReader {
     public static ArrayList<Integer> extractNodes(List<SplayNet.CommunicatingNodes> inputList){
         ArrayList<Integer> outputList = new ArrayList<>();
         for (SplayNet.CommunicatingNodes element: inputList){
-            if (!outputList.contains(element.u) ){
-                outputList.add(element.u);
-            }
-            if (!outputList.contains(element.v) ){
-                outputList.add(element.v);
-            }
+            if (!outputList.contains(element.getU()) ) outputList.add(element.getU());
+            if (!outputList.contains(element.getV()) ) outputList.add(element.getV());
         }
         return outputList;
     }
