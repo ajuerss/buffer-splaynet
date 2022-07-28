@@ -3,7 +3,7 @@ import java.util.*;
 public class SplayNet {
 
     private Node root;   // root of the BST
-    private long searchCost = 0;
+    private long serviceCost = 0;
     private long routingCost = 0;
     private long rotationCost = 0;
     private boolean insertionOver = false;
@@ -11,6 +11,12 @@ public class SplayNet {
 
     public void setInsertionOver(){
         this.insertionOver = true;
+    }
+
+    public void resetCostCounter() {
+        this.serviceCost = 0;
+        this.routingCost = 0;
+        this.rotationCost = 0;
     }
 
     public Node getRoot(){
@@ -33,12 +39,12 @@ public class SplayNet {
         if (insertionOver) this.routingCost += cost;
     }
 
-    public long getSearchCost(){
-        return this.searchCost;
+    public long getServiceCost(){
+        return this.serviceCost;
     }
 
     public void increaseSearchCost(int cost){
-        if (insertionOver) this.searchCost += cost;
+        if (insertionOver) this.serviceCost += cost;
     }
 
     public static class Node {
