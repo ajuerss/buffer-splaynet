@@ -6,12 +6,17 @@ import java.util.List;
 
 public class CSVReader {
 
-    public static List<SplayNet.CommunicatingNodes> readCSV(String path) throws IOException {
+    public static List<SplayNet.CommunicatingNodes> readCSV(String path, long maxRequests) throws IOException {
         List<SplayNet.CommunicatingNodes> ListOfCommNode = new ArrayList<>();
         String line = "";
         BufferedReader br = new BufferedReader(new FileReader(path));
         int count = 0;
-        int maxCount = 10000000;
+        long maxCount;
+        if (maxRequests > 0){
+            maxCount = maxRequests;
+        }else{
+            maxCount = 100000000;
+        }
         while ((line = br.readLine()) != null && count < maxCount){
             String[] values = line.replaceAll("\"", "").split(",");
             int u = Integer.parseInt(values[1]);

@@ -1,10 +1,7 @@
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
 
 public class MainBufferSplayNet {
@@ -35,24 +32,32 @@ public class MainBufferSplayNet {
         Scanner s = new Scanner(System.in);
         // declare where logs of current iterations of the toplogy are needed
         boolean printLogs = printLogQuestionaire(s);
-        SplayNet sn1 = new SplayNet();
         // get parameters for Experiment (Buffersize and Communication pairs). The Splaynet tree will be initialized
-        SplaynetParameters parameters = useParametersQuestionaire(s,printLogs, sn1);
-        List<SplayNet.CommunicatingNodes> inputPairs = parameters.nodeRequestPairs;
-        // set cost counters to zero
-        sn1.setInsertionOver();
-        if (printLogs) System.out.println("SearchCost: " + sn1.getServiceCost() + " RoutingCost:" + sn1.getRoutingCost() + " RotationCost:" + sn1.getRotationCost());
+        SplaynetParameters parameters = useParametersQuestionaire(s,printLogs);
 
         // run experiment with Buffer(Distance Algorithm) on Splaynet
         ArrayList<Result> results = new ArrayList<>();
+        // monitor results for each Buffersize
         for (Integer bufferSize: parameters.bufferSizes){
-            runExperimentDistanceSplaynet(sn1, bufferSize, parameters.nodeRequestPairs, printLogs);
+            // Create and initialize Splaynet with Parameters
+            SplayNet sn_current = new SplayNet();
+            ArrayList<Integer> nodeList = CSVReader.extractNodes(parameters.nodeRequestPairs);
+            initializeSplaynet(sn_current, nodeList);
+            sn_current.setInsertionOver();
+            if (printLogs) System.out.println("input tree:");
+            if (printLogs) sn_current.printPreorder(sn_current.getRoot());
+            if (printLogs) System.out.println();
+            if (printLogs) BTreePrinter.printNode(transform(sn_current));
+            System.out.println("Starting Cost");
+            System.out.println("ServingCost: " + sn_current.getServiceCost() + " RoutingCost:" + sn_current.getRoutingCost() + " RotationCost:" + sn_current.getRotationCost());
+            runExperimentDistanceSplaynet(sn_current, bufferSize, parameters.nodeRequestPairs, printLogs);
             System.out.println("For Buffersize " + bufferSize + ":");
-            System.out.println("SearchCost: " + sn1.getServiceCost() + " RoutingCost:" + sn1.getRoutingCost() + " RotationCost:" + sn1.getRotationCost());
+            System.out.println("ServingCost: " + sn_current.getServiceCost() + " RoutingCost:" + sn_current.getRoutingCost() + " RotationCost:" + sn_current.getRotationCost());
             if (printLogs) System.out.println("Final tree:");
-            if (printLogs) sn1.printPreorder(sn1.getRoot());
-            results.add(new Result(bufferSize, sn1.getServiceCost(), sn1.getRoutingCost(), sn1.getRotationCost()));
-            sn1.resetCostCounter();
+            if (printLogs) sn_current.printPreorder(sn_current.getRoot());
+            System.out.println();
+            BTreePrinter.printNode(transform(sn_current));
+            results.add(new Result(bufferSize, sn_current.getServiceCost(), sn_current.getRoutingCost(), sn_current.getRotationCost()));
         }
         // print results in txt
         writeToTxt(results);
@@ -60,11 +65,11 @@ public class MainBufferSplayNet {
 
     public static void writeToTxt(ArrayList<Result> results){
         try {
-            String path = "./result/results.txt";
+            String path = "./../results/result.txt";
             File file = new File(path);
             int counter = 1;
             while (file.exists()){
-                path = "./result/results" + counter + ".txt";
+                path = "./../results/result" + counter + ".txt";
                 file = new File(path);
             }
             FileWriter myWriter = new FileWriter(path);
@@ -83,7 +88,7 @@ public class MainBufferSplayNet {
         String str = s.next();
         List<Integer> bufferSizes;
         if (str.equalsIgnoreCase("N")) {
-            bufferSizes = new ArrayList<>(Arrays.asList(1, 2, 3, 4, 5, 10, 20, 50, 100));
+            bufferSizes = new ArrayList<>(Arrays.asList(1, 2, 3));
         } else if (str.equalsIgnoreCase("Y")){
             System.out.println("How many buffersizes do you wanna test?");
             int numberSizes = s.nextInt();
@@ -107,14 +112,11 @@ public class MainBufferSplayNet {
         sn.insertBalancedBST(list);
     }
 
-    public static List<SplayNet.CommunicatingNodes> getCSVdata(SplayNet sn) throws IOException {
-        String path = "./csv/online_data.csv";
-        List<SplayNet.CommunicatingNodes> inputPairs = CSVReader.readCSV(path);
-        ArrayList<Integer> nodeList = CSVReader.extractNodes(inputPairs);
-        initializeSplaynet(sn, nodeList);
-        return inputPairs;
+    public static List<SplayNet.CommunicatingNodes> getCSVdata(long maxRequests) throws IOException {
+        String path = "./csv/online_datax.csv";
+        return CSVReader.readCSV(path, maxRequests);
     }
-    public static List<SplayNet.CommunicatingNodes> getCustomCommunicationNodes(Scanner s, SplayNet sn){
+    public static List<SplayNet.CommunicatingNodes> getCustomCommunicationNodes(Scanner s){
         List<SplayNet.CommunicatingNodes> inputPairs= new ArrayList<>();
         System.out.println("Enter number of requests:");
         int requestNumber = s.nextInt();
@@ -123,30 +125,37 @@ public class MainBufferSplayNet {
             SplayNet.CommunicatingNodes x = new SplayNet.CommunicatingNodes(i, s.nextInt(), s.nextInt());
             inputPairs.add(x);
         }
-        initializeSplaynet(sn, CSVReader.extractNodes(inputPairs));
         return inputPairs;
     }
 
-    public static SplaynetParameters useParametersQuestionaire(Scanner s, boolean printLogs, SplayNet sn1) throws Exception {
+    public static long limitRequestQuestionnaire(Scanner s) throws Exception {
+        long numberRequests;
+        System.out.println("Do you want to limit the number of Requests of CSV data (Y/N)?");
+        String str = s.next();
+        if (str.equalsIgnoreCase("N")) {
+            numberRequests = -1;
+        } else if (str.equalsIgnoreCase("Y")){
+            System.out.println("How Many Requests maximum (f.e. 100000)?");
+            numberRequests = s.nextLong();
+        } else {
+            throw new Exception("wront Input");
+        }
+        return numberRequests;
+    }
+
+    public static SplaynetParameters useParametersQuestionaire(Scanner s, boolean printLogs) throws Exception {
         System.out.println("Do you want to use CSV data as paramters (Y/N)?");
         String str = s.next();
         List<SplayNet.CommunicatingNodes> inputPairs;
         if (str.equalsIgnoreCase("N")) {
-            inputPairs = getCustomCommunicationNodes(s, sn1);
+            inputPairs = getCustomCommunicationNodes(s);
         } else if (str.equalsIgnoreCase("Y")){
-            inputPairs = getCSVdata(sn1);
+            long maxRequests = limitRequestQuestionnaire(s);
+            inputPairs = getCSVdata(maxRequests);
         } else {
             throw new Exception("wront Input");
         }
         List<Integer> bufferSizes = getBuffersizeQuestionaire(s);
-
-        // logs for better observability
-        if (printLogs) System.out.println("input tree:");
-        if (printLogs) sn1.printPreorder(sn1.getRoot());
-        if (printLogs) System.out.println();
-        if (printLogs) BTreePrinter.printNode(transform(sn1));
-
-
         return new SplaynetParameters(bufferSizes, inputPairs);
     }
 
@@ -161,35 +170,44 @@ public class MainBufferSplayNet {
                 buffer.calcPriority();
                 buffer.sort();
                 for (Buffer.BufferNodePair k: buffer.getListBufferNodePairs()){
-                    if (printLogs) System.out.println("ID: " + k.nodePair.getId()+ " U: " + k.nodePair.getU() + " V: " + k.nodePair.getV() + " Priorität: " + k.getPriority() + " DIST: "  + (k.getPriority() + k.getTimestamp()) + " TS: " + k.getTimestamp());
+                    if (printLogs) System.out.printf("ID:%d U:%d V:%d P:%d DST:%d TS:%d\n", k.nodePair.getId(), k.nodePair.getU(), k.nodePair.getV(), k.getPriority(), k.getDistance(), k.getTimestamp());
                 }
-                if (printLogs) System.out.println("Prioritätskosten:" + sn1.getRoutingCost());
                 Buffer.BufferNodePair popNode = buffer.getListBufferNodePairs().get(0);
                 buffer.removeListBufferNodePairs(0);
-                sn1.increaseSearchCost(popNode.getPriority() + popNode.getTimestamp());
-                sn1.commute(popNode.nodePair.getU(), popNode.nodePair.getV());
+                if (printLogs) System.out.printf("Served Requested %d and %d\n", popNode.nodePair.getU(), popNode.nodePair.getV());
+                sn1.increaseServingCost(popNode.getPriority() + popNode.getTimestamp());
+                SplayNet.Node lastLCA = sn1.commute(popNode.getLca(),popNode.nodePair.getU(), popNode.nodePair.getV());
+                buffer.setLastLCA(lastLCA);
                 buffer.increaseTimestamp();
                 Buffer.BufferNodePair x = new Buffer.BufferNodePair(element);
                 buffer.addListBufferNodePairs(x);
                 if (printLogs) System.out.println("Zwischenstand:");
                 if (printLogs) sn1.printPreorder(sn1.getRoot());
-                if (printLogs) System.out.println("SearchCost: " + sn1.getServiceCost() + " RoutingCost:" + sn1.getRoutingCost() + " RotationCost:" + sn1.getRotationCost());
+                if (printLogs) System.out.println();
+                if (printLogs) BTreePrinter.printNode(transform(sn1));
+                if (printLogs) System.out.println("ServingCost: " + sn1.getServiceCost() + " RoutingCost:" + sn1.getRoutingCost() + " RotationCost:" + sn1.getRotationCost());
             }
-            if (printLogs) System.out.println("input:" + element.getU() + " " + element.getV());
+            if (printLogs) System.out.println("Incoming Request:" + element.getU() + " " + element.getV());
         }
         while (!buffer.getListBufferNodePairs().isEmpty()){
             buffer.calcPriority();
             buffer.sort();
+            if (printLogs) System.out.println("Elements in Buffer:");
             for (Buffer.BufferNodePair k: buffer.getListBufferNodePairs()){
-                if (printLogs) System.out.println("ID: " + k.nodePair.getId() + " Priorität: " + k.getPriority() + " TS: " + k.getTimestamp());
+                if (printLogs) System.out.printf("ID:%d U:%d V:%d P:%d DST:%d TS:%d\n", k.nodePair.getId(), k.nodePair.getU(), k.nodePair.getV(), k.getPriority(), k.getDistance(), k.getTimestamp());
             }
-            Buffer.BufferNodePair x = buffer.getListBufferNodePairs().get(0);
+            Buffer.BufferNodePair popNode = buffer.getListBufferNodePairs().get(0);
             buffer.removeListBufferNodePairs(0);
-            sn1.commute(x.nodePair.getU(), x.nodePair.getV());
+            if (printLogs) System.out.printf("Served Requested %d and %d\n", popNode.nodePair.getU(), popNode.nodePair.getV());
+            sn1.increaseServingCost(popNode.getPriority() + popNode.getTimestamp());
+            SplayNet.Node lastLCA = sn1.commute(popNode.getLca(), popNode.nodePair.getU(), popNode.nodePair.getV());
+            buffer.setLastLCA(lastLCA);
             buffer.increaseTimestamp();
-            if (printLogs) System.out.println("SearchCost: " + sn1.getServiceCost() + " RoutingCost:" + sn1.getRoutingCost() + " RotationCost:" + sn1.getRotationCost());
+            if (printLogs) System.out.println("ServingCost: " + sn1.getServiceCost() + " RoutingCost:" + sn1.getRoutingCost() + " RotationCost:" + sn1.getRotationCost());
             if (printLogs) System.out.println("Zwischenstand:");
             if (printLogs) sn1.printPreorder(sn1.getRoot());
+            if (printLogs) System.out.println();
+            if (printLogs) System.out.println();
         }
     }
 
@@ -225,3 +243,16 @@ public class MainBufferSplayNet {
         }
     }
 }
+/*
+Random random = new Random();
+        Random random1 = new Random();
+        int x = 0;
+        int rand;
+        int rand1;
+        while (x < 30){
+            rand = random.nextInt(16);
+            rand1 = random1.nextInt(16);
+            if (rand != rand1) System.out.printf("%d,%d,%d\n", x, rand, rand1);
+            x++;
+        }
+ */

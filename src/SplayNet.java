@@ -8,7 +8,6 @@ public class SplayNet {
     private long rotationCost = 0;
     private boolean insertionOver = false;
 
-
     public void setInsertionOver(){
         this.insertionOver = true;
     }
@@ -43,7 +42,7 @@ public class SplayNet {
         return this.serviceCost;
     }
 
-    public void increaseSearchCost(int cost){
+    public void increaseServingCost(int cost){
         if (insertionOver) this.serviceCost += cost;
     }
 
@@ -66,6 +65,7 @@ public class SplayNet {
         public Node getRight(){
             return this.right;
         }
+        public Node getParent(){ return this.parent; }
     }
 
     public static class CommunicatingNodes {
@@ -88,9 +88,11 @@ public class SplayNet {
             return this.v;
         }
     }
-    public int cost(int u, int v){
+    public int calculateDistance(Buffer.BufferNodePair element, int u, int v, boolean noBuffer){
         Node node = this.root;
         Node common_ancestor;
+        int cost = 0;
+        int distance = 0;
         while (node != null && ((u > node.key && v > node.key) || (u < node.key && v < node.key))) {
             if (u > node.key)
             {
@@ -98,10 +100,10 @@ public class SplayNet {
             } else {
                 node = node.left;
             }
-            this.routingCost++;
+            cost++;
         }
-        int cost = 0;
         common_ancestor = node;
+        element.setLca(common_ancestor);
         while (node != null && node.key != u)        //Finding Node(u)
         {
             if (u < node.key) {
@@ -110,7 +112,7 @@ public class SplayNet {
                 node = node.right;
             }
             cost++;
-            this.routingCost++;
+            distance++;
         }
         node = common_ancestor;
         while (node != null && node.key != v)        //Finding Node(u)
@@ -121,9 +123,10 @@ public class SplayNet {
                 node = node.right;
             }
             cost++;
-            this.routingCost++;
+            distance++;
         }
-        return cost;
+        if (!noBuffer) this.increaseRoutingCost(cost);
+        return distance;
     }
     /***************************************************************************
      *  Splay tree insertion.
@@ -135,16 +138,17 @@ public class SplayNet {
         Collections.sort(nodeList);
         int k = nodeList.size()/2;
         this.root = new Node(nodeList.get(k));
-        this.root.left = insertionIteration(nodeList.subList(0,k));
-        this.root.right = insertionIteration(nodeList.subList(k+1,nodeList.size()));
+        this.root.left = insertionIteration(nodeList.subList(0,k), this.root);
+        this.root.right = insertionIteration(nodeList.subList(k+1,nodeList.size()), this.root);
     }
 
-    public Node insertionIteration (List<Integer> nodeList){
+    public Node insertionIteration (List<Integer> nodeList, Node parent){
         if (nodeList.isEmpty()) return null;
         int k = nodeList.size()/2;
         Node newNode = new Node(nodeList.get(k));
-        newNode.left = insertionIteration(nodeList.subList(0,k));
-        newNode.right = insertionIteration(nodeList.subList(k+1,nodeList.size()));
+        newNode.parent = parent;
+        newNode.left = insertionIteration(nodeList.subList(0,k), newNode);
+        newNode.right = insertionIteration(nodeList.subList(k+1,nodeList.size()), newNode);
         return newNode;
     }
 
@@ -175,7 +179,7 @@ public class SplayNet {
         } else {
             throw new Exception("es gibt schon diesen Key oder es ist ein fehler beim einfügen pasiert");
         }
-        root = splay(root, key);
+        splay_new(root, key);
 
     }
 
@@ -184,38 +188,41 @@ public class SplayNet {
      *  => This function communicates between two inputs key u and key v.
      *  => By the end of excution of this function bith u and v are splayed to their common ancestor
      ***************************************************************************/
-    public void commute ( int u, int v) throws Exception        //Assuming u amd v always exist in the tree && u<=v
+    public Node commute (Node k, int u, int v) throws Exception
     {
-        Node[] nodeSet = findNodes(u, v);
+        /*
+        Node[] nodeSet = findLCA(u, v);
         Node common_ancestor = nodeSet[0];
         Node parent_CA = nodeSet[1];
-        Node uNode = nodeSet[2];
-        Node vNode = nodeSet[3];
+        */
+        Node common_ancestor = k;
+        Node parent_CA;
+        parent_CA = Objects.requireNonNullElse(common_ancestor.parent, common_ancestor);
+        Node newLCA;
         if (parent_CA.key > common_ancestor.key) {
-            parent_CA.left = splay(common_ancestor, u);
-            this.increaseRoutingCost(1);
+            newLCA = splay_new(common_ancestor, u);
         } else if (parent_CA.key < common_ancestor.key) {
-            parent_CA.right = splay(common_ancestor, u);
-            this.increaseRoutingCost(1);
+            newLCA = splay_new(common_ancestor, u);
         } else {
-            this.root = splay(this.root, u);
+            newLCA = splay_new(this.root, u);
         }
         if (u == v)
             throw new Exception("gleiche Knoten kommunizieren");
-
-        if (uNode.key > vNode.key) {
-            uNode.left = splay(uNode.left, v);
+        if (u > v) {
+            splay_new(newLCA.left, v);
         }
-        if (uNode.key < vNode.key) {
-            uNode.right = splay(uNode.right, v);
+        if (u < v) {
+            splay_new(newLCA.right, v);
         }
+        this.increaseRoutingCost(1);
+        return newLCA;
     }
 
-    public Node[] findNodes ( int u, int v){
+    public Node[] findLCA ( int u, int v){
         Node node = this.root;
-        Node[] nodeSet = new Node[4];
+        Node[] nodeSet = new Node[2];
         Node parent_CA = node;
-
+        int cost = 0;
         while (node != null && ((u > node.key && v > node.key) || (u < node.key && v < node.key))) {
             if (u > node.key)
             {
@@ -225,39 +232,12 @@ public class SplayNet {
                 parent_CA = node;
                 node = node.left;
             }
-            this.increaseRoutingCost(1);
+            cost++;
         }
+        assert node != null;
+        this.increaseRoutingCost(cost);
         nodeSet[1] = parent_CA;
         nodeSet[0] = node;        //nodeSet[0]=common_ancester
-        Node uNode = node;
-        Node vNode = node;
-        while (uNode != null && uNode.key != u)
-        {
-            if (u < uNode.key) {
-                uNode = uNode.left;
-            } else {
-                uNode = uNode.right;
-            }
-            this.increaseRoutingCost(1);
-        }
-        while (vNode != null && vNode.key != v)
-        {
-            if (v < vNode.key) {
-                vNode = vNode.left;
-            } else {
-                vNode = vNode.right;
-            }
-            this.increaseRoutingCost(1);
-        }
-        if (Objects.requireNonNull(uNode).getKey() != u || Objects.requireNonNull(vNode).getKey() != v){
-            try {
-                throw new Exception("U/V haben nicht die richtigen keys");
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        nodeSet[2] = uNode;
-        nodeSet[3] = vNode;
         return nodeSet;
     }
 
@@ -268,21 +248,81 @@ public class SplayNet {
      * =>If a node with that key exists, it is splayed to the root of the tree.
      * => If it does not, the last node along the search path for the key is splayed to the root.
      * **********************************************************************/
+    private Node splay_new(Node h, int key) throws Exception {
+        if (h == null) throw new Exception("Node in Splay() does not exist");
+        Node node = h;
+        while (node != null){
+            if (node.getKey() > key){
+                node = node.left;
+                this.increaseRoutingCost(1);
+            }else if (node.getKey() < key){
+                node = node.right;
+                this.increaseRoutingCost(1);
+            }else if (node.getKey() == key){
+                splay_up(h, node);
+                return node;
+            }
+        }
+        throw new Exception("Node in Splay() not found");
+    }
+    private Node splay_up(Node h, Node k) throws Exception {
+        if (h == k){
+            return k;
+        } else if (k.getParent() == h){
+            if(h.getLeft() == k){
+                rotateRight(h);
+            }else if (h.getRight() == k){
+                rotateLeft(h);
+            }else{
+                throw new Exception("H should be parent, but not has k as child");
+            }
+            return k;
+        }else{
+            boolean found = (h == k.getParent().getParent());
+            if (k.getParent().getParent().getRight() == k.getParent()){
+                if (k.getParent().getRight() == k){
+                    rotateLeft(k.getParent().getParent());
+                }else if (k.getParent().getLeft() == k){
+                    rotateRight(k.getParent());
+                }else{
+                    throw new Exception("k.p has not k as child");
+                }
+                rotateLeft(k.getParent());
+            }else if (k.getParent().getParent().getLeft() == k.getParent()){
+                if (k.getParent().getRight() == k){
+                    rotateLeft(k.getParent());
+                }else if (k.getParent().getLeft() == k){
+                    rotateRight(k.getParent().getParent());
+                }else{
+                    throw new Exception("k.p has not k as child");
+                }
+                rotateRight(k.getParent());
+            } else{
+                throw new Exception("k.p.p has not k.p as child");
+            }
+            if(found) return k;
+        }
+        return splay_up(h,k);
+    }
+
     private Node splay (Node h, int key) throws Exception {
-        if (h == null) return null;     //Node h does not exist
+        if (h == null) throw new Exception("Node in Splay() does not exist");
 
         int cmp1 = key - h.key;
-
+        System.out.printf("Enter Splay for %d\n", h.getKey());
         if (cmp1 < 0) {
             if (h.left == null) throw new Exception("Key not in tree");
             int cmp2 = key - h.left.key;
             this.increaseRoutingCost(1);
+            System.out.printf("First iteration in splay +1 for %d\n", h.getKey());
             if (cmp2 < 0) {     //Left-left case => 2 times right rotate
                 if (h.left.left == null) throw new Exception("Key not in tree");
                 this.increaseRoutingCost(1);
+                System.out.printf("Second iteration in splay +1 for %d\n", h.getKey());
                 h.left.left = splay(h.left.left, key);
                 h = rotateRight(h); //Right rotate
             } else if (cmp2 > 0) {//Left-Right case => Right rotate then Left rotate
+                System.out.printf("Second iteration in splay +1 for %d\n", h.getKey());
                 h.left.right = splay(h.left.right, key);
                 this.increaseRoutingCost(1);
                 if (h.left.right != null)
@@ -294,12 +334,15 @@ public class SplayNet {
             if (h.right == null) throw new Exception("Key not in tree");
             int cmp2 = key - h.right.key;
             this.increaseRoutingCost(1);
+            System.out.printf("First iteration in splay +1 for %d\n", h.getKey());
             if (cmp2 < 0) {             //Right-Left case
+                System.out.printf("Second iteration in splay +1 for %d\n", h.getKey());
                 h.right.left = splay(h.right.left, key);
                 this.increaseRoutingCost(1);
                 if (h.right.left != null)
                     h.right = rotateRight(h.right);  //Right Rotate
             } else if (cmp2 > 0) {        //Right-Right case
+                System.out.printf("Second iteration in splay +1 for %d\n", h.getKey());
                 h.right.right = splay(h.right.right, key);
                 this.increaseRoutingCost(1);
                 h = rotateLeft(h);      //Left rotate
@@ -318,13 +361,26 @@ public class SplayNet {
         if (h.left == null) throw new Exception("kein linkes kind bei rechtsrotation");
         Node x = h.left;
         h.left = x.right;
-        if (x.right != null) this.increaseRotationCost(2);
-        if (h.parent != null) this.increaseRotationCost(2);
+        int cost = 0;
+        if (x.right != null) cost+=2;
+        if (h.parent != null) cost+=2;
         if (h.left != null) h.left.parent = h;
         x.right = h;
         x.parent = h.parent;
         h.parent = x;
-        this.increaseRotationCost(2);
+        if (x.parent != null){
+            if (x.parent.left == h){
+                x.parent.left = x;
+            }else if (x.parent.right == h){
+                x.parent.right = x;
+            }else{
+                throw new Exception("x.p hatte h nicht als kind");
+            }
+        }else{
+            this.root = x;
+        }
+        cost+=2;
+        increaseRotationCost(cost);
         return x;
     }
 
@@ -333,13 +389,26 @@ public class SplayNet {
         if (h.right == null) throw new Exception("kein rechtes kind bei linksrotation");
         Node x = h.right;
         h.right = x.left;
-        if (x.left != null) this.increaseRotationCost(2);
-        if (h.parent != null) this.increaseRotationCost(2);
+        int cost = 0;
+        if (x.left != null) cost+=2;
+        if (h.parent != null) cost+=2;
         if (h.right != null) h.right.parent = h;
         x.left = h;
         x.parent = h.parent;
         h.parent = x;
-        this.increaseRotationCost(2);
+        if (x.parent != null){
+            if (x.parent.left == h){
+                x.parent.left = x;
+            }else if (x.parent.right == h){
+                x.parent.right = x;
+            }else{
+                throw new Exception("x.p hatte h nicht als kind");
+            }
+        }else{
+            this.root = x;
+        }
+        cost+=2;
+        increaseRotationCost(cost);
         return x;
     }
 
