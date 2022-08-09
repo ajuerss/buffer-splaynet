@@ -91,7 +91,8 @@ public class SplayNet {
     public int calculateDistance(Buffer.BufferNodePair element, int u, int v, boolean noBuffer){
         Node node = this.root;
         Node common_ancestor;
-        int cost = 0;
+        int costLca = 0;                // Cost for finding LCA
+        int costDistance = 0;           // Cost for calculating the Distance
         int distance = 0;
         while (node != null && ((u > node.key && v > node.key) || (u < node.key && v < node.key))) {
             if (u > node.key)
@@ -100,7 +101,7 @@ public class SplayNet {
             } else {
                 node = node.left;
             }
-            cost++;
+            costLca++;
         }
         common_ancestor = node;
         element.setLca(common_ancestor);
@@ -111,21 +112,24 @@ public class SplayNet {
             } else {
                 node = node.right;
             }
-            cost++;
+            costDistance++;
             distance++;
         }
         node = common_ancestor;
-        while (node != null && node.key != v)        //Finding Node(u)
+        while (node != null && node.key != v)        //Finding Node(v)
         {
             if (v < node.key) {
                 node = node.left;
             } else {
                 node = node.right;
             }
-            cost++;
+            costDistance++;
             distance++;
         }
-        if (!noBuffer) this.increaseRoutingCost(cost);
+        this.increaseRoutingCost(costLca);
+        //System.out.printf("Routingcost increased by %d for finding LCA %d\n", costLca, common_ancestor.getKey());
+        if (!noBuffer) this.increaseRoutingCost(costDistance);
+        //System.out.printf("Routingcost increased by %d for finding distance\n", costDistance);
         return distance;
     }
     /***************************************************************************
@@ -195,6 +199,7 @@ public class SplayNet {
         Node common_ancestor = nodeSet[0];
         Node parent_CA = nodeSet[1];
         */
+        if (k == null) throw new Exception ("Commute wurde ein leerer node als lca gegeben");
         Node common_ancestor = k;
         Node parent_CA;
         parent_CA = Objects.requireNonNullElse(common_ancestor.parent, common_ancestor);
@@ -215,6 +220,7 @@ public class SplayNet {
             splay_new(newLCA.right, v);
         }
         this.increaseRoutingCost(1);
+        //System.out.println("Routingcost increased by 1 for routing to element v to splay up and initialize splay");
         return newLCA;
     }
 
@@ -251,14 +257,17 @@ public class SplayNet {
     private Node splay_new(Node h, int key) throws Exception {
         if (h == null) throw new Exception("Node in Splay() does not exist");
         Node node = h;
+        int cost = 0;
         while (node != null){
             if (node.getKey() > key){
                 node = node.left;
-                this.increaseRoutingCost(1);
+                cost++;
             }else if (node.getKey() < key){
                 node = node.right;
-                this.increaseRoutingCost(1);
+                cost++;
             }else if (node.getKey() == key){
+                //System.out.printf("Routing Cost increased by %d for finding %d from LCA for splay\n", cost, key);
+                this.increaseRoutingCost(cost);
                 splay_up(h, node);
                 return node;
             }
@@ -309,20 +318,17 @@ public class SplayNet {
         if (h == null) throw new Exception("Node in Splay() does not exist");
 
         int cmp1 = key - h.key;
-        System.out.printf("Enter Splay for %d\n", h.getKey());
         if (cmp1 < 0) {
             if (h.left == null) throw new Exception("Key not in tree");
             int cmp2 = key - h.left.key;
             this.increaseRoutingCost(1);
-            System.out.printf("First iteration in splay +1 for %d\n", h.getKey());
+            //System.out.printf("First iteration in splay +1 for %d\n", h.getKey());
             if (cmp2 < 0) {     //Left-left case => 2 times right rotate
                 if (h.left.left == null) throw new Exception("Key not in tree");
                 this.increaseRoutingCost(1);
-                System.out.printf("Second iteration in splay +1 for %d\n", h.getKey());
                 h.left.left = splay(h.left.left, key);
                 h = rotateRight(h); //Right rotate
             } else if (cmp2 > 0) {//Left-Right case => Right rotate then Left rotate
-                System.out.printf("Second iteration in splay +1 for %d\n", h.getKey());
                 h.left.right = splay(h.left.right, key);
                 this.increaseRoutingCost(1);
                 if (h.left.right != null)
@@ -334,15 +340,12 @@ public class SplayNet {
             if (h.right == null) throw new Exception("Key not in tree");
             int cmp2 = key - h.right.key;
             this.increaseRoutingCost(1);
-            System.out.printf("First iteration in splay +1 for %d\n", h.getKey());
             if (cmp2 < 0) {             //Right-Left case
-                System.out.printf("Second iteration in splay +1 for %d\n", h.getKey());
                 h.right.left = splay(h.right.left, key);
                 this.increaseRoutingCost(1);
                 if (h.right.left != null)
                     h.right = rotateRight(h.right);  //Right Rotate
             } else if (cmp2 > 0) {        //Right-Right case
-                System.out.printf("Second iteration in splay +1 for %d\n", h.getKey());
                 h.right.right = splay(h.right.right, key);
                 this.increaseRoutingCost(1);
                 h = rotateLeft(h);      //Left rotate

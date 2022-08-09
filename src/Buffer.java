@@ -35,7 +35,7 @@ public class Buffer {
         private int priority;
         private int timestamp;
 
-        private SplayNet.Node lca;
+        private SplayNet.Node lca = null;
 
         public BufferNodePair(SplayNet.CommunicatingNodes commNodes){
             this.nodePair = commNodes;
@@ -69,21 +69,25 @@ public class Buffer {
         int lowerbound = -1;
         int upperbound = -1;
         for (BufferNodePair element: listBufferNodePairs){
-            boolean noBuffer = false;
-            if (listBufferNodePairs.size() == 1) noBuffer = true;
+            boolean noBuffer = listBufferNodePairs.size() == 1;
             if (this.lastLCA != null && element.distance != 0){
                 int lastLCA = this.lastLCA.getKey();
-                if (lowerbound == -1) lowerbound = findRangeLastLCASubtree()[0];
-                if (upperbound == -1) upperbound = findRangeLastLCASubtree()[1];
-                //System.out.printf("Bounds calculated, lower: %d upper: %d",lowerbound, upperbound);
+                if (lowerbound == -1 || upperbound == -1) {
+                    int[] temp = findRangeLastLCASubtree();
+                    lowerbound = temp[0];
+                    upperbound = temp[1];
+                }
+                //System.out.printf("LB: %d, UB: %d\n", lowerbound, upperbound);
                 int u = element.nodePair.getU();
                 int v = element.nodePair.getV();
-                if(!((u < upperbound && u > lowerbound)||(v < upperbound && v > lowerbound)||
-                        (u == lastLCA || v == lastLCA))){
+                if((u < upperbound && u > lowerbound)||(v < upperbound && v > lowerbound)||
+                        (u == lastLCA || v == lastLCA)){
                     element.distance = usedNet.calculateDistance(element, element.nodePair.getU(), element.nodePair.getV(), noBuffer);
+                    //System.out.printf("Distance recalculated for %d and %d\n", u, v);
                 }
             } else{
                 element.distance = usedNet.calculateDistance(element, element.nodePair.getU(), element.nodePair.getV(), noBuffer);
+                //System.out.printf("Distance calculated for %d and %d\n", element.nodePair.getU(), element.nodePair.getV());
             }
             element.priority = element.distance - element.timestamp;
         }
@@ -99,7 +103,7 @@ public class Buffer {
         SplayNet.Node node = this.usedNet.getRoot();
         int key = this.lastLCA.getKey();
         int lowerBound = 0;
-        int upperBound = 100000;
+        int upperBound = Integer.MAX_VALUE;
         int increaseCost = 0;
         while (node != null && node.getKey() != key){
             if (key < node.getKey()) {
@@ -111,7 +115,7 @@ public class Buffer {
             }
             increaseCost++;
         }
-        //System.out.printf("RoutingCost increased by %d through finding the range of lastLCA subtree", increaseCost);
+        //System.out.printf("RoutingCost increased by %d through finding the range of lastLCA subtree\n", increaseCost);
         this.usedNet.increaseRoutingCost(increaseCost);
         return new int[]{lowerBound, upperBound};
     }
