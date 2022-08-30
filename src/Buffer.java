@@ -6,15 +6,8 @@ import java.util.stream.Collectors;
 public class Buffer {
     private final SplayNet usedNet;
     private final int bufferSize;
-
-    private SplayNet.Node lastLCA;
-
     private List<BufferNodePair> listBufferNodePairs = new ArrayList<>();
-
-    public void setLastLCA(SplayNet.Node element){this.lastLCA = element;}
-
     public List<BufferNodePair> getListBufferNodePairs(){return this.listBufferNodePairs;}
-
     public void addListBufferNodePairs(BufferNodePair element){this.listBufferNodePairs.add(element);}
 
     public void removeListBufferNodePairs(int x){ this.listBufferNodePairs.remove(x);}
@@ -35,8 +28,6 @@ public class Buffer {
         private int priority;
         private int timestamp;
 
-        private SplayNet.Node lca = null;
-
         public BufferNodePair(SplayNet.CommunicatingNodes commNodes){
             this.nodePair = commNodes;
             this.timestamp = 0;
@@ -52,10 +43,6 @@ public class Buffer {
         public void setPriority(int k) { this.priority = k; }
         public int getTimestamp() { return this.timestamp; }
         public void setTimestamp(int k) { this.timestamp = k; }
-        public SplayNet.Node getLca() {
-            return this.lca;
-        }
-        public void setLca(SplayNet.Node k) { this.lca = k; }
 
     }
     public void increaseTimestamp(){
@@ -66,57 +53,62 @@ public class Buffer {
     }
 
     public void calcPriority(){
-        int lowerbound = -1;
-        int upperbound = -1;
         for (BufferNodePair element: listBufferNodePairs){
-            boolean noBuffer = listBufferNodePairs.size() == 1;
-            if (this.lastLCA != null && element.distance != 0){
-                int lastLCA = this.lastLCA.getKey();
-                if (lowerbound == -1 || upperbound == -1) {
-                    int[] temp = findRangeLastLCASubtree();
-                    lowerbound = temp[0];
-                    upperbound = temp[1];
-                }
-                //System.out.printf("LB: %d, UB: %d\n", lowerbound, upperbound);
-                int u = element.nodePair.getU();
-                int v = element.nodePair.getV();
-                if((u < upperbound && u > lowerbound)||(v < upperbound && v > lowerbound)||
-                        (u == lastLCA || v == lastLCA)){
-                    element.distance = usedNet.calculateDistance(element, element.nodePair.getU(), element.nodePair.getV(), noBuffer);
-                    //System.out.printf("Distance recalculated for %d and %d\n", u, v);
-                }
-            } else{
-                element.distance = usedNet.calculateDistance(element, element.nodePair.getU(), element.nodePair.getV(), noBuffer);
-                //System.out.printf("Distance calculated for %d and %d\n", element.nodePair.getU(), element.nodePair.getV());
+            if (element.distance == 0){
+                element.distance = usedNet.calculateDistance((listBufferNodePairs.size() == 1), element.nodePair.getU(), element.nodePair.getV());
             }
             element.priority = element.distance - element.timestamp;
         }
+    }
+
+    public void updateDistances(int[] a, int[] b,int[] c){
+        for (BufferNodePair element: listBufferNodePairs){
+            int u = element.nodePair.getU();
+            int v = element.nodePair.getV();
+            int uGroup;
+            int vGroup;
+
+            if (inBetween(u,a[0],a[1])){
+                uGroup = 1;
+            } else if (inBetween(u,b[0],b[1])){
+                uGroup = 2;
+            } else if (inBetween(u,c[0],c[1])){
+                uGroup = 3;
+            }else {
+                uGroup = 4;
+            }
+            if (inBetween(v,a[0],a[1])){
+                vGroup = 1;
+            } else if (inBetween(v,b[0],b[1])){
+                vGroup = 2;
+            } else if (inBetween(v,c[0],c[1])){
+                vGroup = 3;
+            }else {
+                vGroup = 4;
+            }
+
+            if ((uGroup == 1 && vGroup == 3) || (uGroup == 3 && vGroup == 1) ||
+                    (uGroup == 2 && vGroup == 4) || (uGroup == 4 && vGroup == 2)){
+                element.distance++;
+                //System.out.println("Dist von " + u + " und " + v + " um 1 erhöhrt mit " + uGroup + " und " + vGroup);
+            }
+            if ((uGroup == 1 && vGroup == 4) || (uGroup == 4 && vGroup == 1) ||
+                    (uGroup == 2 && vGroup == 3) || (uGroup == 3 && vGroup == 2)){
+                element.distance--;
+                //System.out.println("Dist von " + u + " und " + v + " um 1 verringert mit " + uGroup + " und " + vGroup);
+
+
+            }
+        }
+    }
+
+    private boolean inBetween(int number, int lowerBound, int upperBound){
+        return number >= lowerBound && number <= upperBound;
     }
 
     public void sort(){
         this.listBufferNodePairs = this.listBufferNodePairs.stream()
                 .sorted(Comparator.comparing(BufferNodePair::getPriority))
                 .collect(Collectors.toList());
-    }
-
-    public int[] findRangeLastLCASubtree(){
-        SplayNet.Node node = this.usedNet.getRoot();
-        int key = this.lastLCA.getKey();
-        int lowerBound = 0;
-        int upperBound = Integer.MAX_VALUE;
-        int increaseCost = 0;
-        while (node != null && node.getKey() != key){
-            if (key < node.getKey()) {
-                upperBound = node.getKey();
-                node = node.getLeft();
-            } else {
-                lowerBound = node.getKey();
-                node = node.getRight();
-            }
-            increaseCost++;
-        }
-        //System.out.printf("RoutingCost increased by %d through finding the range of lastLCA subtree\n", increaseCost);
-        this.usedNet.increaseRoutingCost(increaseCost);
-        return new int[]{lowerBound, upperBound};
     }
 }

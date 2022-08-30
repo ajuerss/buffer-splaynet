@@ -6,7 +6,10 @@ public class SplayNet {
     private long serviceCost = 0;
     private long routingCost = 0;
     private long rotationCost = 0;
+
+    private Buffer buffer;
     private boolean insertionOver = false;
+
 
     public void setInsertionOver(){
         this.insertionOver = true;
@@ -42,13 +45,21 @@ public class SplayNet {
         return this.serviceCost;
     }
 
-    public void increaseServingCost(int cost){
+    public void increaseServingCost(int cost) throws Exception {
+        if (cost < 0) throw new Exception("distance < 0");
+        if (cost == 0) throw new Exception("distance = 0");
         if (insertionOver) this.serviceCost += cost;
     }
+
+    public void setBuffer(Buffer buffer) {this.buffer = buffer; }
 
     public static class Node {
         private final int key;
         private Node parent, left, right;
+
+        private int lastLeftParent = 0;
+
+        private int lastRightParent = 0;
 
         public Node(int key) {
             this.key = key;
@@ -88,10 +99,9 @@ public class SplayNet {
             return this.v;
         }
     }
-    public int calculateDistance(Buffer.BufferNodePair element, int u, int v, boolean noBuffer){
+    public int calculateDistance(boolean noBuffer, int u, int v){
         Node node = this.root;
         Node common_ancestor;
-        int costLca = 0;                // Cost for finding LCA
         int costDistance = 0;           // Cost for calculating the Distance
         int distance = 0;
         while (node != null && ((u > node.key && v > node.key) || (u < node.key && v < node.key))) {
@@ -101,10 +111,9 @@ public class SplayNet {
             } else {
                 node = node.left;
             }
-            costLca++;
+            costDistance++;
         }
         common_ancestor = node;
-        element.setLca(common_ancestor);
         while (node != null && node.key != u)        //Finding Node(u)
         {
             if (u < node.key) {
@@ -126,10 +135,7 @@ public class SplayNet {
             costDistance++;
             distance++;
         }
-        this.increaseRoutingCost(costLca);
-        //System.out.printf("Routingcost increased by %d for finding LCA %d\n", costLca, common_ancestor.getKey());
         if (!noBuffer) this.increaseRoutingCost(costDistance);
-        //System.out.printf("Routingcost increased by %d for finding distance\n", costDistance);
         return distance;
     }
     /***************************************************************************
@@ -146,6 +152,15 @@ public class SplayNet {
         this.root.right = insertionIteration(nodeList.subList(k+1,nodeList.size()), this.root);
     }
 
+    public void assignLastParents(Node node, int left, int right){
+        if (node != null){
+            node.lastLeftParent = left;
+            node.lastRightParent = right;
+            assignLastParents(node.left, left, node.key);
+            assignLastParents(node.right, node.key, right);
+        }
+    }
+
     public Node insertionIteration (List<Integer> nodeList, Node parent){
         if (nodeList.isEmpty()) return null;
         int k = nodeList.size()/2;
@@ -155,54 +170,16 @@ public class SplayNet {
         newNode.right = insertionIteration(nodeList.subList(k+1,nodeList.size()), newNode);
         return newNode;
     }
-
-    public void insert ( int key) throws Exception {
-        if (root == null) {         //=> Tree is null
-            root = new Node(key);
-            return;
-        }
-        Node iterator = root;
-        Node lastNode = iterator;
-        while (iterator != null) {
-            lastNode = iterator;
-            if (key < iterator.key) {
-                iterator = iterator.left;
-            } else if (key > iterator.key) {
-                iterator = iterator.right;
-            } else {
-                throw new Exception("es gibt schon diesen Key");
-            }
-        }
-        Node newNode = new Node(key);
-        if (key > lastNode.key) {
-            lastNode.right = newNode;
-            newNode.parent = lastNode;
-        } else if (key < lastNode.key) {
-            lastNode.left = newNode;
-            newNode.parent = lastNode;
-        } else {
-            throw new Exception("es gibt schon diesen Key oder es ist ein fehler beim einfügen pasiert");
-        }
-        splay_new(root, key);
-
-    }
-
     /***************************************************************************
      *  SplayNet function
      *  => This function communicates between two inputs key u and key v.
      *  => By the end of excution of this function bith u and v are splayed to their common ancestor
      ***************************************************************************/
-    public Node commute (Node k, int u, int v) throws Exception
+    public void commute (int u, int v) throws Exception
     {
-        /*
-        Node[] nodeSet = findLCA(u, v);
-        Node common_ancestor = nodeSet[0];
-        Node parent_CA = nodeSet[1];
-        */
-        if (k == null) throw new Exception ("Commute wurde ein leerer node als lca gegeben");
-        Node common_ancestor = k;
-        Node parent_CA;
-        parent_CA = Objects.requireNonNullElse(common_ancestor.parent, common_ancestor);
+        Node common_ancestor = findLCA(u, v);
+        if (common_ancestor == null) throw new Exception ("Commute wurde ein leerer node als lca gegeben");
+        Node parent_CA = Objects.requireNonNullElse(common_ancestor.parent, common_ancestor);
         Node newLCA;
         if (parent_CA.key > common_ancestor.key) {
             newLCA = splay_new(common_ancestor, u);
@@ -220,31 +197,23 @@ public class SplayNet {
             splay_new(newLCA.right, v);
         }
         this.increaseRoutingCost(1);
-        //System.out.println("Routingcost increased by 1 for routing to element v to splay up and initialize splay");
-        return newLCA;
     }
 
-    public Node[] findLCA ( int u, int v){
+    public Node findLCA (int u, int v){
         Node node = this.root;
-        Node[] nodeSet = new Node[2];
-        Node parent_CA = node;
         int cost = 0;
         while (node != null && ((u > node.key && v > node.key) || (u < node.key && v < node.key))) {
             if (u > node.key)
             {
-                parent_CA = node;
                 node = node.right;
             } else {
-                parent_CA = node;
                 node = node.left;
             }
             cost++;
         }
         assert node != null;
         this.increaseRoutingCost(cost);
-        nodeSet[1] = parent_CA;
-        nodeSet[0] = node;        //nodeSet[0]=common_ancester
-        return nodeSet;
+        return node;
     }
 
 
@@ -384,6 +353,22 @@ public class SplayNet {
         }
         cost+=2;
         increaseRotationCost(cost);
+
+        //System.out.println("Rotation Right With " + x.getKey() + " and " + h.getKey());
+
+        x.lastRightParent = h.lastRightParent;
+        h.lastLeftParent = x.key;
+
+        int[] a = {x.lastLeftParent+1, x.key};
+        int[] b = {h.key, h.lastRightParent-1};
+        int[] c;
+        if (h.left != null){
+            c = new int[]{h.left.lastLeftParent + 1, h.left.lastRightParent - 1};
+        }else{
+            c = new int[]{0, 0};
+        }
+        this.buffer.updateDistances(a, b, c);
+
         return x;
     }
 
@@ -412,6 +397,21 @@ public class SplayNet {
         }
         cost+=2;
         increaseRotationCost(cost);
+
+        //System.out.println("Rotation Left With " + x.getKey() + " and " + h.getKey());
+
+        x.lastLeftParent = h.lastLeftParent;
+        h.lastRightParent = x.key;
+        int[] a = {x.key, x.lastRightParent-1};
+        int[] b = {h.lastLeftParent+1, h.key};
+        int[] c;
+        if (h.right != null){
+            c = new int[]{h.right.lastLeftParent + 1, h.right.lastRightParent - 1};
+        }else{
+            c = new int[]{0, 0};
+        }
+        this.buffer.updateDistances(a, b, c);
+
         return x;
     }
 
@@ -425,7 +425,7 @@ public class SplayNet {
         if (node.right != null) right = node.right.key;
         if (node.left != null) left = node.left.key;
         if (node.parent != null) parent = node.parent.key;
-        System.out.print("Node " + node.key + " has left Child: " + left + " and right Child: " + right + " and Parent: " + parent + "\n");
+        System.out.printf("Node %d has left Child: %d and right Child: %d and Parent: %d... lastleft %d lastright %d\n", node.key, left, right, parent, node.lastLeftParent, node.lastRightParent);
         printPreorder(node.left);
         printPreorder(node.right);
     }
