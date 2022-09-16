@@ -28,6 +28,7 @@ public class MainBufferSplayNet {
     }
 
     public static void main (String[]args) throws Exception {
+
         //printRequests();
         Scanner s = new Scanner(System.in);
         // declare where logs of current iterations of the toplogy are needed
@@ -67,7 +68,7 @@ public class MainBufferSplayNet {
     }
 
     public static void runExperimentDistanceSplaynet(SplayNet sn1, int bufferSize, List<SplayNet.CommunicatingNodes> nodeRequestPairs, boolean printLogs) throws Exception {
-        Buffer buffer = new Buffer (sn1, bufferSize);
+        Buffer buffer = new Buffer(sn1, bufferSize);
         sn1.setBuffer(buffer);
         for (SplayNet.CommunicatingNodes element: nodeRequestPairs){
             if (buffer.isSpace()){
@@ -86,9 +87,33 @@ public class MainBufferSplayNet {
         }
     }
 
+    public static void runExperimentClusterSplaynet(SplayNet sn1, int bufferSize, List<SplayNet.CommunicatingNodes> nodeRequestPairs, boolean printLogs) throws Exception {
+        Buffer buffer = new Buffer(sn1, bufferSize);
+        sn1.setBuffer(buffer);
+        for (SplayNet.CommunicatingNodes element: nodeRequestPairs){
+            if (buffer.isSpace()){
+                Buffer.BufferNodePair x = new Buffer.BufferNodePair(element);
+                buffer.addListBufferNodePairs(x);
+                if (printLogs) System.out.println("Incoming Request:" + element.getU() + " " + element.getV());
+            }else{
+                if (buffer.calcDistance(printLogs)){
+                    assert buffer.getBufferSize() == buffer.getListBufferNodePairs().size();
+                    if (printLogs) System.out.println("Clustering buffer done");
+                    buffer.startClustering(printLogs);
+                }
+            }
+        }
+        while (!buffer.getListBufferNodePairs().isEmpty()){
+            buffer.calcDistance(printLogs);
+            if (printLogs) System.out.println("Clustering buffer");
+            buffer.startClustering(printLogs);
+            if (printLogs) System.out.println("Clustering buffer done");
+        }
+    }
+
     public static void popElementFromBuffer(Buffer buffer, boolean printLogs, SplayNet sn1) throws Exception {
         buffer.calcPriority();
-        buffer.sort();
+        buffer.sortByPriority();
         if (printLogs) System.out.println("Elements in Buffer:");
         for (Buffer.BufferNodePair k: buffer.getListBufferNodePairs()){
             if (printLogs) System.out.printf("ID:%d U:%d V:%d P:%d DST:%d TS:%d\n", k.nodePair.getId(), k.nodePair.getU(), k.nodePair.getV(), k.getPriority(), k.getDistance(), k.getTimestamp());
@@ -105,7 +130,7 @@ public class MainBufferSplayNet {
     }
 
     public static List<SplayNet.CommunicatingNodes> getCSVdata(long maxRequests) throws IOException {
-        String path = "./csv/online_data.csv";
+        String path = "./csv/online_datax1.csv";
         return CSVReader.readCSV(path, maxRequests);
     }
 
