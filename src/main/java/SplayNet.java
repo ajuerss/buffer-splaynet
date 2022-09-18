@@ -62,7 +62,7 @@ public class SplayNet {
 
         private int lastLeftParent = 0;
 
-        private int lastRightParent = 0;
+        private int lastRightParent = Integer.MAX_VALUE;
 
         public Node(int key) {
             this.key = key;
@@ -159,6 +159,24 @@ public class SplayNet {
         if (node != null){
             node.lastLeftParent = left;
             node.lastRightParent = right;
+            assignLastParents(node.left, left, node.key);
+            assignLastParents(node.right, node.key, right);
+        }
+    }
+
+    public void checkLastParents(Node node, int left, int right) throws Exception {
+        if (node != null){
+            if (!(node.lastRightParent == right)){
+                System.out.printf("Node %d has lastRightParent %d, but should have %d", node.getKey(), node.lastRightParent, right);
+                this.printPreorder(this.root);
+                throw new Exception("last parents wrong");
+            }
+            if (!(node.lastLeftParent == left)){
+                System.out.printf("Node %d has lastLeftParent %d, but should have %d\n", node.getKey(), node.lastLeftParent, left);
+                this.printPreorder(this.root);
+                throw new Exception("last parents wrong");
+            }
+
             assignLastParents(node.left, left, node.key);
             assignLastParents(node.right, node.key, right);
         }
@@ -368,7 +386,7 @@ public class SplayNet {
         if (h.left != null){
             c = new int[]{h.left.lastLeftParent + 1, h.left.lastRightParent - 1};
         }else{
-            c = new int[]{0, 0};
+            c = new int[]{-1, -1};
         }
         this.buffer.updateDistances(a, b, c);
 
@@ -411,7 +429,7 @@ public class SplayNet {
         if (h.right != null){
             c = new int[]{h.right.lastLeftParent + 1, h.right.lastRightParent - 1};
         }else{
-            c = new int[]{0, 0};
+            c = new int[]{-1, -1};
         }
         this.buffer.updateDistances(a, b, c);
 

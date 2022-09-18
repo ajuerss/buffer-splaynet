@@ -1,7 +1,10 @@
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Scanner;
 
 public class MainBufferSplayNet {
 
@@ -28,7 +31,6 @@ public class MainBufferSplayNet {
     }
 
     public static void main (String[]args) throws Exception {
-
         //printRequests();
         Scanner s = new Scanner(System.in);
         // declare where logs of current iterations of the toplogy are needed
@@ -64,7 +66,7 @@ public class MainBufferSplayNet {
 
     public static void initializeSplaynet(SplayNet sn, ArrayList<Integer> list){
         sn.insertBalancedBST(list);
-        sn.assignLastParents(sn.getRoot(), 0, Integer.MAX_VALUE);
+        sn.assignLastParents(sn.getRoot(), -1, Integer.MAX_VALUE);
     }
 
     public static void runExperimentDistanceSplaynet(SplayNet sn1, int bufferSize, List<SplayNet.CommunicatingNodes> nodeRequestPairs, boolean printLogs) throws Exception {
@@ -77,6 +79,7 @@ public class MainBufferSplayNet {
                 buffer.addListBufferNodePairs(x);
             }else{
                 popElementFromBuffer(buffer, printLogs, sn1);
+                sn1.checkLastParents(sn1.getRoot(), -1, Integer.MAX_VALUE);
                 Buffer.BufferNodePair x = new Buffer.BufferNodePair(element);
                 buffer.addListBufferNodePairs(x);
             }
@@ -121,6 +124,7 @@ public class MainBufferSplayNet {
         Buffer.BufferNodePair popNode = buffer.getListBufferNodePairs().get(0);
         buffer.removeListBufferNodePairs(0);
         if (printLogs) System.out.printf("Served Requested %d and %d\n", popNode.nodePair.getU(), popNode.nodePair.getV());
+
         sn1.increaseServingCost(popNode.getDistance());
         sn1.commute(popNode.nodePair.getU(), popNode.nodePair.getV());
         buffer.increaseTimestamp();
@@ -130,7 +134,7 @@ public class MainBufferSplayNet {
     }
 
     public static List<SplayNet.CommunicatingNodes> getCSVdata(long maxRequests) throws IOException {
-        String path = "./csv/online_datax1.csv";
+        String path = "./csv/online_data.csv";
         return CSVReader.readCSV(path, maxRequests);
     }
 
@@ -254,19 +258,4 @@ public class MainBufferSplayNet {
             return x;
         }
     }
-    public static void printRequests(){
-        int num = 100;
-        int nodes = 31;
-        int k = 0;
-        while (k < num){
-            Random rand = new Random();
-            int ran1 = rand.nextInt(nodes) + 1;
-            int ran2 = rand.nextInt(nodes) + 1;
-            if (ran1 != ran2){
-                k++;
-                System.out.printf("%d,%d,%d\n",k,ran1,ran2);
-            }
-        }
-    }
-
 }

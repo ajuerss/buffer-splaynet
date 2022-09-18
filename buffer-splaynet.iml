@@ -15,5 +15,11 @@
     <orderEntry type="library" name="Maven: org.jheaps:jheaps:0.13" level="project" />
     <orderEntry type="library" name="Maven: org.jgrapht:jgrapht-ext:1.5.1" level="project" />
     <orderEntry type="library" name="Maven: com.github.vlsi.mxgraph:jgraphx:4.1.0" level="project" />
+    <orderEntry type="library" name="Maven: com.opencsv:opencsv:4.1" level="project" />
+    <orderEntry type="library" name="Maven: org.apache.commons:commons-lang3:3.6" level="project" />
+    <orderEntry type="library" name="Maven: org.apache.commons:commons-text:1.1" level="project" />
+    <orderEntry type="library" name="Maven: commons-beanutils:commons-beanutils:1.9.3" level="project" />
+    <orderEntry type="library" name="Maven: commons-logging:commons-logging:1.2" level="project" />
+    <orderEntry type="library" name="Maven: commons-collections:commons-collections:3.2.2" level="project" />
   </component>
 </module>
