@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 import pymetis
-
+import json
 
 def partition(adj_list, cuts: int):
     partitions, mem = pymetis.part_graph(cuts, adjacency=adj_list)
@@ -9,15 +9,27 @@ def partition(adj_list, cuts: int):
 
 
 if __name__ == '__main__':
-    s = sys.argv[1]
-    prop_cuts = int(sys.argv[2])
-    s = list(map(str, s.split('.')))
-    prop = []
-    for x in s:
-        x = x[1:]
-        x = x[:len(x)-1]
-        x = list(map(int, x.split(',')))
-        prop.append(x)
-    n_cuts, membership = partition(prop, prop_cuts)
+    with open('./../buffer-splaynet/json/input.json', 'r') as r:
+        data = json.load(r)
+    prop = data['array']
+    maxComponentSize = data['maxComponentSize']
+    prop_cuts = 2
+    done = False
+    while not done:
+        done = True
+        n_cuts, membership = partition(prop, prop_cuts)
+        for k in range(prop_cuts):
+            count = 0
+            for j in range(len(membership)):
+                if membership[j] == k:
+                    count += 1
+            if count > maxComponentSize:
+                prop_cuts += 1
+                done = False
+                print("more cuts")
+                break
+    person_dict = {'array': membership, 'cuts': prop_cuts}
+    with open('./../buffer-splaynet/json/output.json', 'w') as w:
+        json.dump(person_dict, w)
     print(n_cuts)
     print(membership)

@@ -1,11 +1,35 @@
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.util.Arrays;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+
+import java.io.FileReader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 public class Part_Graph {
-
     public static void main(String[] args) throws Exception {
-        for (int k = 0; k<10;k++) {
+        ArrayList<Buffer.BufferNodePair> p = new ArrayList<>();
+        p.add(new Buffer.BufferNodePair(new SplayNet.CommunicatingNodes(1, 2, 3)));
+        p.add(new Buffer.BufferNodePair(new SplayNet.CommunicatingNodes(1, 2, 3)));
+        p.add(new Buffer.BufferNodePair(new SplayNet.CommunicatingNodes(1, 1, 4)));
+        p.add(new Buffer.BufferNodePair(new SplayNet.CommunicatingNodes(1, 3, 4)));
+        p.add(new Buffer.BufferNodePair(new SplayNet.CommunicatingNodes(1, 2, 1)));
+        for(Buffer.BufferNodePair element: p){
+            System.out.print(element.getU() + "-" + element.getV() + ";");
+        }
+        System.out.println();
+        call_part_graph(p, 4);
+        for(ArrayList<Buffer.BufferNodePair> j: call_part_graph(p, 4)){
+            for(Buffer.BufferNodePair element: j){
+                System.out.print(element.getU() + "-" + element.getV() + ";");
+            }
+            System.out.println();
+        }
+        /*for (int k = 0; k<10;k++) {
             long start = System.nanoTime();
             double elapsedTime = (double) (System.nanoTime() - start) / 1_000_000_000;
             System.out.println("Ohne Parser: " + elapsedTime);
@@ -16,50 +40,96 @@ public class Part_Graph {
             }
             double elapsedTime1 = (double) (System.nanoTime() - start1) / 1_000_000_000;
             System.out.println("Mit Parser: " + elapsedTime1);
-        }
+        }*/
     }
 
-    //https://stackoverflow.com/questions/14155669/call-python-script-from-bash-with-argument
-    public static void call_python_script() throws Exception {
-        int[][] var = {{1, 1, 2}, {0, 0}, {0}, {4}, {3}};
-        int num_cuts = 2;
-        StringBuilder prop = new StringBuilder();
-        for (int[] ints : var) {
-            prop.append(Arrays.toString(ints));
-            prop.append(".");
+    public static void writeInJSON(ArrayList<ArrayList<Integer>> matrix, double maxComponentSize) throws Exception {
+
+
+        JSONObject data = new JSONObject();
+        data.put("maxComponentSize", (int)maxComponentSize);
+
+        JSONArray m = new JSONArray();
+        for(ArrayList<Integer> element: matrix){
+            JSONArray array = new JSONArray();
+            for (Integer number: element){
+                array.add(number);
+            }
+            m.add(array);
         }
-        prop.deleteCharAt(prop.length() - 1);
-        String adj_str = prop.toString();
-        String cuts_str = String.valueOf(num_cuts);
-        adj_str = adj_str.replaceAll(" ", "");
-        Process p = Runtime.getRuntime().exec("python3 src/main/java/metis.py " + adj_str + " " + cuts_str);
+        data.put("array", m);
+        Files.write(Paths.get("./json/", "input.json"), data.toJSONString().getBytes());
+    }
 
-        BufferedReader stdInput = new BufferedReader(new
-                InputStreamReader(p.getInputStream()));
+    public static ArrayList<ArrayList<Buffer.BufferNodePair>> call_part_graph(ArrayList<Buffer.BufferNodePair> list, double maxComponentSize) throws Exception {
+        ArrayList<Buffer.BufferNodePair> originalList = list;
+        ArrayList<ArrayList<Buffer.BufferNodePair>> newList = new ArrayList<>();
 
-        BufferedReader stdError = new BufferedReader(new
-                InputStreamReader(p.getErrorStream()));
-        /*
-        System.out.println("Here is the standard output of the command:\n");
-        int number_of_cuts = Integer.parseInt(stdInput.readLine());
-
-        String str = stdInput.readLine();
-        str = str.substring(0, str.length() - 1);
-        str = str.substring(1);
-        String[] str_arr = str.split(",");
-        List<Integer> int_list = new ArrayList<Integer>();
-        for(String s : str_arr){
-            int_list.add(Integer.parseInt(s.trim()));
+        Map<Integer, Integer> dic = new HashMap<Integer, Integer>();
+        ArrayList<ArrayList<Integer>> matrix = new ArrayList<>();
+        int count = 0;
+        for (Buffer.BufferNodePair element: originalList){
+            if (!dic.containsKey(element.nodePair.getU())){
+                dic.put(element.nodePair.getU(), count);
+                count++;
+            }
+            if (!dic.containsKey(element.nodePair.getV())){
+                dic.put(element.nodePair.getV(), count);
+                count++;
+            }
+            while(matrix.size() < count){
+                matrix.add(new ArrayList<Integer>());
+            }
+            matrix.get(dic.get(element.nodePair.getU())).add(dic.get(element.nodePair.getV()));
+            matrix.get(dic.get(element.nodePair.getV())).add(dic.get(element.nodePair.getU()));
         }
-        System.out.println(int_list);
-        System.out.println(number_of_cuts);
+        writeInJSON(matrix, maxComponentSize);
+        Thread.sleep(1000);
+        Runtime.getRuntime().exec("python3 src/main/java/metis.py");
+        Thread.sleep(1000);
+        JSONParser jsonParser = new JSONParser();
+        FileReader reader = new FileReader(String.valueOf(Paths.get("./json/", "output.json")));
+        JSONObject obj = (JSONObject) jsonParser.parse(reader);
+        JSONArray resultArray =  (JSONArray) obj.get("array");
+        int cuts = (int) (long)obj.get("cuts");
 
-        String k = null;
-        System.out.println("Here is the standard error of the command (if any):\n");
-        while ((k = stdError.readLine()) != null) {
-            System.out.println(k);
+        ArrayList<ArrayList<Integer>> newComponentsNodes = new ArrayList<>();
+        for (int k = 0; k < cuts; k++){
+            newComponentsNodes.add(new ArrayList<Integer>());
+            for(int n = 0; n < resultArray.size(); n++){
+                if (Integer.parseInt(resultArray.get(n).toString()) == k){
+                    newComponentsNodes.get(k).add(getKeyByValue(dic, n));
+                }
+            }
         }
-        */
+
+        for(ArrayList<Integer> element: newComponentsNodes){
+            ArrayList<Buffer.BufferNodePair> newComponent = new ArrayList<>();
+            for(Integer node: element){
+                ArrayList<Buffer.BufferNodePair> found = new ArrayList<>();
+                for(Buffer.BufferNodePair request: originalList){
+                    if(request.nodePair.getU() == node || request.nodePair.getV() == node){
+                        found.add(request);
+                        newComponent.add(request);
+                    }
+                }
+                originalList.removeAll(found);
+                newList.add(newComponent);
+            }
+        }
+        if (originalList.size() > 0) throw new Exception("this.listBufferNodePairs bigger than one");
+
+        return newList;
+
+    }
+
+    public static <T, E> T getKeyByValue(Map<T, E> map, E value) {
+        for (Map.Entry<T, E> entry : map.entrySet()) {
+            if (Objects.equals(value, entry.getValue())) {
+                return entry.getKey();
+            }
+        }
+        return null;
     }
 
 }

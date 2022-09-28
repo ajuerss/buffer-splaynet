@@ -31,7 +31,6 @@ public class MainBufferSplayNet {
     }
 
     public static void main (String[]args) throws Exception {
-        //printRequests();
         Scanner s = new Scanner(System.in);
         // declare where logs of current iterations of the toplogy are needed
         boolean printLogs = printLogQuestionaire(s);
@@ -51,9 +50,9 @@ public class MainBufferSplayNet {
             if (printLogs) sn_current.printPreorder(sn_current.getRoot());
             if (printLogs) System.out.println();
             //if (printLogs) BTreePrinter.printNode(transform(sn_current));
-            runExperimentDistanceSplaynet(sn_current, bufferSize, parameters.nodeRequestPairs, printLogs);
+            runExperimentClusterSplaynet(sn_current, bufferSize, parameters.nodeRequestPairs, printLogs);
             System.out.println("For Buffersize " + bufferSize + ":");
-            System.out.println("ServingCost: " + sn_current.getServiceCost() + " RoutingCost:" + sn_current.getRoutingCost() + " RotationCost:" + sn_current.getRotationCost());
+            System.out.println("ServingCost: " + sn_current.getServiceCost() + " RoutingCost:" + sn_current.getRoutingCost() + " RotationCost:" + sn_current.getRotationCost() + " 3/4:" + sn_current.TF + "/" + sn_current.total);
             if (printLogs) System.out.println("Final tree:");
             if (printLogs) sn_current.printPreorder(sn_current.getRoot());
             if (printLogs) System.out.println();
@@ -78,15 +77,20 @@ public class MainBufferSplayNet {
                 Buffer.BufferNodePair x = new Buffer.BufferNodePair(element);
                 buffer.addListBufferNodePairs(x);
             }else{
-                popElementFromBuffer(buffer, printLogs, sn1);
-                sn1.checkLastParents(sn1.getRoot(), -1, Integer.MAX_VALUE);
+                if(buffer.calcPriority(printLogs)){
+                    popElementFromBuffer(buffer, printLogs, sn1);
+                    sn1.checkLastParents(sn1.getRoot(), -1, Integer.MAX_VALUE);
+                }
                 Buffer.BufferNodePair x = new Buffer.BufferNodePair(element);
                 buffer.addListBufferNodePairs(x);
             }
             if (printLogs) System.out.println("Incoming Request:" + element.getU() + " " + element.getV());
         }
         while (!buffer.getListBufferNodePairs().isEmpty()){
-            popElementFromBuffer(buffer, printLogs, sn1);
+            buffer.calcPriority(printLogs);
+            if(!buffer.getListBufferNodePairs().isEmpty()){
+                popElementFromBuffer(buffer, printLogs, sn1);
+            };
         }
     }
 
@@ -101,21 +105,24 @@ public class MainBufferSplayNet {
             }else{
                 if (buffer.calcDistance(printLogs)){
                     assert buffer.getBufferSize() == buffer.getListBufferNodePairs().size();
-                    if (printLogs) System.out.println("Clustering buffer done");
+                    if (printLogs) System.out.println("Clustering buffer Start");
                     buffer.startClustering(printLogs);
                 }
+                Buffer.BufferNodePair x = new Buffer.BufferNodePair(element);
+                buffer.addListBufferNodePairs(x);
+                if (printLogs) System.out.println("Incoming Request:" + element.getU() + " " + element.getV());
             }
         }
         while (!buffer.getListBufferNodePairs().isEmpty()){
-            buffer.calcDistance(printLogs);
-            if (printLogs) System.out.println("Clustering buffer");
-            buffer.startClustering(printLogs);
-            if (printLogs) System.out.println("Clustering buffer done");
+            if (buffer.calcDistance(printLogs)){
+                if (printLogs) System.out.println("Clustering buffer");
+                buffer.startClustering(printLogs);
+                if (printLogs) System.out.println("Clustering buffer done");
+            }
         }
     }
 
     public static void popElementFromBuffer(Buffer buffer, boolean printLogs, SplayNet sn1) throws Exception {
-        buffer.calcPriority();
         buffer.sortByPriority();
         if (printLogs) System.out.println("Elements in Buffer:");
         for (Buffer.BufferNodePair k: buffer.getListBufferNodePairs()){
@@ -196,11 +203,11 @@ public class MainBufferSplayNet {
     }
 
     public static List<Integer> getBuffersizeQuestionaire(Scanner s) throws Exception {
-        System.out.println("Do you want to select custom Buffersizes (Default: 1, 2, 3, 4, 5, 10, 20, 50, 100)?");
+        System.out.println("Do you want to select custom Buffersizes (Default: 1, 2, 3, 4, 5, 10, 20, 50, 100, 200, 500)?");
         String str = s.next();
         List<Integer> bufferSizes;
         if (str.equalsIgnoreCase("N")) {
-            bufferSizes = new ArrayList<>(Arrays.asList(1, 2, 3, 4, 5, 10, 20, 50, 100));
+            bufferSizes = new ArrayList<>(Arrays.asList(1, 2, 3, 4, 5, 10, 20, 50, 100, 200, 500));
         } else if (str.equalsIgnoreCase("Y")){
             System.out.println("How many buffersizes do you wanna test?");
             int numberSizes = s.nextInt();

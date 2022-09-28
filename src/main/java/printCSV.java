@@ -13,9 +13,10 @@ public class printCSV {
     }
 
     public static void printRequests() throws Exception {
-        int num = 1000000;
-        int nodes = 31;
+        int num = 50;
+        int nodes = 15;
         int k = 0;
+        double p = 0.3;
         List<String[]> dataLines = new ArrayList<>();
         while (k < num){
             Random rand = new Random();
@@ -26,7 +27,16 @@ public class printCSV {
                 dataLines.add(new String[]{ String.valueOf(k), String.valueOf(ran1), String.valueOf(ran2) });
             }
         }
-        Path path = FileSystems.getDefault().getPath("./csv/", "test.csv");
+        for (int o = 0; o < dataLines.size()-1; o++){
+            Random r = new Random();
+            double randomValue = r.nextDouble();
+            System.out.println(randomValue);
+            if (randomValue < p){
+                dataLines.get(o+1)[1] = dataLines.get(o)[1];
+                dataLines.get(o+1)[2] = dataLines.get(o)[2];
+            }
+        }
+        Path path = FileSystems.getDefault().getPath("./csv/", "n"+nodes+"seq"+num+".csv");
         writeLineByLine(dataLines, path);
     }
 
