@@ -2,7 +2,9 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
+import java.io.BufferedReader;
 import java.io.FileReader;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -18,12 +20,12 @@ public class Part_Graph {
         p.add(new Buffer.BufferNodePair(new SplayNet.CommunicatingNodes(1, 1, 4)));
         p.add(new Buffer.BufferNodePair(new SplayNet.CommunicatingNodes(1, 3, 4)));
         p.add(new Buffer.BufferNodePair(new SplayNet.CommunicatingNodes(1, 2, 1)));
+
         for(Buffer.BufferNodePair element: p){
             System.out.print(element.getU() + "-" + element.getV() + ";");
         }
         System.out.println();
-        call_part_graph(p, 4);
-        for(ArrayList<Buffer.BufferNodePair> j: call_part_graph(p, 4)){
+        for(ArrayList<Buffer.BufferNodePair> j: call_part_graph(p, 4, true)){
             for(Buffer.BufferNodePair element: j){
                 System.out.print(element.getU() + "-" + element.getV() + ";");
             }
@@ -61,14 +63,13 @@ public class Part_Graph {
         Files.write(Paths.get("./json/", "input.json"), data.toJSONString().getBytes());
     }
 
-    public static ArrayList<ArrayList<Buffer.BufferNodePair>> call_part_graph(ArrayList<Buffer.BufferNodePair> list, double maxComponentSize) throws Exception {
-        ArrayList<Buffer.BufferNodePair> originalList = list;
+    public static ArrayList<ArrayList<Buffer.BufferNodePair>> call_part_graph(ArrayList<Buffer.BufferNodePair> list, double maxComponentSize, boolean printLogs) throws Exception {
         ArrayList<ArrayList<Buffer.BufferNodePair>> newList = new ArrayList<>();
 
         Map<Integer, Integer> dic = new HashMap<Integer, Integer>();
         ArrayList<ArrayList<Integer>> matrix = new ArrayList<>();
         int count = 0;
-        for (Buffer.BufferNodePair element: originalList){
+        for (Buffer.BufferNodePair element: list){
             if (!dic.containsKey(element.nodePair.getU())){
                 dic.put(element.nodePair.getU(), count);
                 count++;
@@ -84,11 +85,14 @@ public class Part_Graph {
             matrix.get(dic.get(element.nodePair.getV())).add(dic.get(element.nodePair.getU()));
         }
         writeInJSON(matrix, maxComponentSize);
-        Thread.sleep(1000);
-        Runtime.getRuntime().exec("python3 src/main/java/metis.py");
-        Thread.sleep(1000);
+        Process process = Runtime.getRuntime().exec("python3 src/main/java/metis.py");
+
+        BufferedReader stdInput = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        String output = stdInput.readLine();
+
+        String s = String.valueOf(Paths.get("./json/", "output.json"));
         JSONParser jsonParser = new JSONParser();
-        FileReader reader = new FileReader(String.valueOf(Paths.get("./json/", "output.json")));
+        FileReader reader = new FileReader(s);
         JSONObject obj = (JSONObject) jsonParser.parse(reader);
         JSONArray resultArray =  (JSONArray) obj.get("array");
         int cuts = (int) (long)obj.get("cuts");
@@ -102,25 +106,97 @@ public class Part_Graph {
                 }
             }
         }
+        if (printLogs){
+            for(ArrayList<Integer> x: newComponentsNodes){
+                System.out.println(x);
+            }
+        }
 
         for(ArrayList<Integer> element: newComponentsNodes){
             ArrayList<Buffer.BufferNodePair> newComponent = new ArrayList<>();
-            for(Integer node: element){
-                ArrayList<Buffer.BufferNodePair> found = new ArrayList<>();
-                for(Buffer.BufferNodePair request: originalList){
-                    if(request.nodePair.getU() == node || request.nodePair.getV() == node){
-                        found.add(request);
-                        newComponent.add(request);
-                    }
+            ArrayList<Buffer.BufferNodePair> found = new ArrayList<>();
+            for(Buffer.BufferNodePair request: list){
+                if(element.contains(request.nodePair.getU()) && element.contains(request.nodePair.getV())){
+                    found.add(request);
+                    newComponent.add(request);
                 }
-                originalList.removeAll(found);
-                newList.add(newComponent);
+            }
+            list.removeAll(found);
+            newList.add(newComponent);
+        }
+
+        if (printLogs){
+            System.out.println("new cluster");
+            for(ArrayList<Buffer.BufferNodePair> j: newList){
+                for(Buffer.BufferNodePair element: j){
+                    System.out.print(element.getU() + "-" + element.getV() + ";");
+                }
+                System.out.println();
             }
         }
-        if (originalList.size() > 0) throw new Exception("this.listBufferNodePairs bigger than one");
+
+        ArrayList<Buffer.BufferNodePair> found = new ArrayList<>();
+        for(Buffer.BufferNodePair element: list){
+            boolean foundU = false;
+            boolean foundV = false;
+            int uIndex = -1;
+            int vIndex = -1;
+            for(int k = 0; k < newComponentsNodes.size(); k++){
+                if(newComponentsNodes.get(k).contains(element.getU())){
+                    foundU = true;
+                    uIndex = k;
+                }
+                if(newComponentsNodes.get(k).contains(element.getV())){
+                    foundV = true;
+                    vIndex = k;
+                }
+                if (foundU && foundV) break;
+            }
+            if (uIndex < 0 || vIndex < 0) throw new Exception("edge between clusters not found");
+            int countU = 0;
+            int countV = 0;
+            for (Buffer.BufferNodePair edge: newList.get(uIndex)){
+                if (edge.nodePair.getU() == element.nodePair.getU() || edge.nodePair.getV() == element.nodePair.getU()){
+                    countU++;
+                }
+            }
+            for (Buffer.BufferNodePair edge: newList.get(vIndex)){
+                if (edge.nodePair.getU() == element.nodePair.getV() || edge.nodePair.getV() == element.nodePair.getV()){
+                    countV++;
+                }
+            }
+            if (countU > countV){
+                newList.get(uIndex).add(element);
+            }else{
+                newList.get(vIndex).add(element);
+            }
+            found.add(element);
+
+        }
+        list.removeAll(found);
+        if (list.size() > 0) throw new Exception("this.listBufferNodePairs bigger than one");
+
+        if (printLogs){
+            System.out.println("final cluster");
+            for(ArrayList<Buffer.BufferNodePair> j: newList){
+                for(Buffer.BufferNodePair element: j){
+                    System.out.print(element.getU() + "-" + element.getV() + ";");
+                }
+                System.out.println();
+            }
+        }
+
+        for (ArrayList<Buffer.BufferNodePair> element: newList){
+            if (element.size() <= 0){
+                throw new Exception("leere liste wird hinzugefügt");
+            }
+        }
 
         return newList;
+    }
 
+    public static boolean containsNode(final ArrayList<Buffer.BufferNodePair> list, final int value){
+        return list.stream().anyMatch(o -> o.getU() == value) || list.stream().anyMatch(o -> o.getV() == value);
     }
 
     public static <T, E> T getKeyByValue(Map<T, E> map, E value) {

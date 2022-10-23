@@ -10,12 +10,33 @@ public class SplayNet {
     private long routingCost = 0;
     private long rotationCost = 0;
 
-    public int TF = 0;
-    public int total = 0;
+    private long[] timestamps;
+
+    private long executionTime;
+    private int numberNodes = 0;
+
+    public int partitions = 0;
+    public int clusters = 0;
     private Buffer buffer;
+
     private boolean insertionOver = false;
 
 
+    public int getNumberNodes(){ return this.numberNodes; }
+
+    public long getTimestamp(int idx){ return this.timestamps[idx]; }
+
+    public long[] getAllTimestamps(){ return this.timestamps;}
+
+    public long getExecutionTime(){ return this.executionTime;}
+
+    public void setNumberNodes(int number){
+        this.numberNodes = number;
+    }
+    public void initializeTimestamps(int number){ this.timestamps = new long[number];}
+    public void setTimestamps(int idx, long value){ this.timestamps[idx] = value; }
+
+    public void setExecutionTime(long value){ this.executionTime = value;}
     public void setInsertionOver(){
         this.insertionOver = true;
     }

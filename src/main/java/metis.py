@@ -26,10 +26,7 @@ if __name__ == '__main__':
             if count > maxComponentSize:
                 prop_cuts += 1
                 done = False
-                print("more cuts")
                 break
     person_dict = {'array': membership, 'cuts': prop_cuts}
     with open('./../buffer-splaynet/json/output.json', 'w') as w:
         json.dump(person_dict, w)
-    print(n_cuts)
-    print(membership)

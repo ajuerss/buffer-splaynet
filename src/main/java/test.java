@@ -1,25 +1,22 @@
-import java.util.ArrayList;
+import static java.lang.System.currentTimeMillis;
+import static java.lang.System.nanoTime;
 
 public class test {
 
-    public static void main(String[] args) throws Exception {
-        SplayNet.CommunicatingNodes x1 = new SplayNet.CommunicatingNodes(1, 1, 2);
-        SplayNet.CommunicatingNodes x5 = new SplayNet.CommunicatingNodes(5, 1, 2);
-        SplayNet.CommunicatingNodes x2 = new SplayNet.CommunicatingNodes(2, 1, 3);
-        SplayNet.CommunicatingNodes x3 = new SplayNet.CommunicatingNodes(3, 2, 3);
-        SplayNet.CommunicatingNodes x4 = new SplayNet.CommunicatingNodes(4, 3, 2);
+    public static void main (String[]args){
+        double k = 100000;
+        double n = 0;
+        long start = currentTimeMillis();
+        while (n < k){
+            for (int x = 0; x < 1000000000; x++){
 
-        Buffer.BufferNodePair y1 = new Buffer.BufferNodePair(x1);
-        Buffer.BufferNodePair y5 = new Buffer.BufferNodePair(x5);
-        Buffer.BufferNodePair y2 = new Buffer.BufferNodePair(x2);
-        Buffer.BufferNodePair y3 = new Buffer.BufferNodePair(x3);
-        Buffer.BufferNodePair y4 = new Buffer.BufferNodePair(x4);
-
-        ArrayList<Buffer.BufferNodePair> list = new ArrayList<>();
-        list.add(y1);
-        list.add(y2);
-        list.add(y3);
-        list.add(y4);
-        list.add(y5);
+            }
+            n+=50;
+            System.out.println(currentTimeMillis()-start);
+        }
+        double x = ((double)5/(double)3);
+        System.out.println(x);
+        long end = nanoTime();
+        System.out.println(end-start);
     }
 }

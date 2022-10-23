@@ -66,6 +66,8 @@ public class Buffer {
             return this.priority;
         }
 
+        public SplayNet.CommunicatingNodes getNodePair(){ return this.nodePair;}
+
         public int getDistance() {
             return this.distance;
         }
@@ -88,11 +90,12 @@ public class Buffer {
             if (element.distance == 0){
                 element.distance = usedNet.calculateDistance((listBufferNodePairs.size() == 1), element.nodePair.getU(), element.nodePair.getV());
             }
-            element.priority = element.distance - element.timestamp;
+            element.priority = element.distance + element.timestamp;
             if (element.distance == 1){
                 fullBuffer = false;
                 if (printLogs) System.out.printf("%d and %d with dist 1 served\n", element.nodePair.getU(), element.nodePair.getV());
                 elementsToRemove.add(element);
+                this.usedNet.setTimestamps(element.getNodePair().getId(), System.nanoTime()-usedNet.getTimestamp(0));
             }
         }
         if (elementsToRemove.size() > 0){
@@ -136,7 +139,7 @@ public class Buffer {
             int uGroup = values[0];
             int vGroup = values[1];
 
-            if (element.distance == 0) throw new Exception("distance not calculated but updated");
+            if (element.distance == 0) throw new Exception("listBufferNodePairs: distance not calculated but updated");
 
             if ((uGroup == 1 && vGroup == 3) || (uGroup == 3 && vGroup == 1) ||
                     (uGroup == 2 && vGroup == 4) || (uGroup == 4 && vGroup == 2)){
@@ -156,7 +159,7 @@ public class Buffer {
             int uGroup = values[0];
             int vGroup = values[1];
 
-            if (element.distance == 0) throw new Exception("distance not calculated but updated");
+            if (element.distance == 0) throw new Exception("edgelistcounted: distance not calculated but updated");
 
             if ((uGroup == 1 && vGroup == 3) || (uGroup == 3 && vGroup == 1) ||
                     (uGroup == 2 && vGroup == 4) || (uGroup == 4 && vGroup == 2)){
@@ -175,7 +178,7 @@ public class Buffer {
                 int uGroup = values[0];
                 int vGroup = values[1];
 
-                if (element.distance == 0) throw new Exception("distance not calculated but updated");
+                if (element.distance == 0) throw new Exception("edgelist: distance not calculated but updated");
 
                 if ((uGroup == 1 && vGroup == 3) || (uGroup == 3 && vGroup == 1) ||
                         (uGroup == 2 && vGroup == 4) || (uGroup == 4 && vGroup == 2)){
@@ -213,6 +216,7 @@ public class Buffer {
                 fullBuffer = false;
                 if (printLogs) System.out.printf("%d and %d with dist 1 served\n", element.nodePair.getU(), element.nodePair.getV());
                 this.usedNet.increaseServingCost(1);
+                this.usedNet.setTimestamps(element.getNodePair().getId(), System.nanoTime()-usedNet.getTimestamp(0));
                 servedElements.add(element);
             }
         }
@@ -220,20 +224,9 @@ public class Buffer {
         return fullBuffer;
     }
 
-    public void startClustering(boolean printLogs) throws Exception {
+    public void startClustering(boolean printLogs, int algorithm) throws Exception {
         ArrayList<ArrayList<Integer>> components = getClusters(this.listBufferNodePairs, printLogs);
         for(ArrayList<Integer> element: components){
-            /*
-            if (printLogs){
-                for(ArrayList<Integer> x: componentList){
-                    System.out.println("Component: ");
-                    for(Integer node: x){
-                        System.out.print(node +",");
-                    }
-                    System.out.println();
-                }
-            }
-            */
             ArrayList<BufferNodePair> newComponent = new ArrayList<>();
             for(Integer node: element){
                 ArrayList<BufferNodePair> found = new ArrayList<>();
@@ -245,16 +238,19 @@ public class Buffer {
                 }
                 this.listBufferNodePairs.removeAll(found);
             }
-            /*
-            double maxComponentSize = 0.75*this.bufferSize;
+            double n = this.usedNet.getNumberNodes();
+            double a = 0.01;
+            double factor = ((2*n-4)/(((n*n-n)/2)-1))/a;
+            double maxComponentSize = factor*n;
             if(element.size() > maxComponentSize){
-                this.usedNet.TF++;
-                this.edgeList.addAll(Part_Graph.call_part_graph(newComponent, maxComponentSize));
+                if (printLogs) System.out.println("partitioning component");
+                this.usedNet.clusters++;
+                this.usedNet.partitions++;
+                this.edgeList.addAll(Part_Graph.call_part_graph(newComponent, maxComponentSize, printLogs));
             }else{
+                this.usedNet.clusters++;
                 this.edgeList.add(newComponent);
             }
-             */
-            this.edgeList.add(newComponent);
         }
         if (this.listBufferNodePairs.size() > 0) throw new Exception("this.listBufferNodePairs bigger than one");
 
@@ -279,10 +275,21 @@ public class Buffer {
             }
             element.removeAll(foundE);
             if (element.size() > 0) throw new Exception("element.size() bigger than one");
-            prioritizeInClustersEdgeWeight(printLogs);
+            if (this.edgeListCounted.size() > 0){
+                if (algorithm == 2){
+                    prioritizeInClustersDistance(printLogs);
+                }else if (algorithm == 3){
+                    prioritizeInClustersEdgeWeight(printLogs);
+                }else if (algorithm == 4){
+                    prioritizeInClustersNodeByNode(printLogs);
+                }else{
+                    throw new Exception("wrong priority");
+                }
+            }
             this.edgeListCounted.clear();
         }
         this.edgeList.clear();
+
     }
 
     public void prioritizeInClustersDistance(boolean printLogs) throws Exception {
