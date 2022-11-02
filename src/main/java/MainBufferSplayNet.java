@@ -9,6 +9,9 @@ import java.util.Scanner;
 public class MainBufferSplayNet {
 
     public static long[][] timestampCollector;
+    public static long timestamp = 0;
+
+    public static double starvationParameter = 0.5;
 
     private static class SplaynetParameters {
         List<Integer> bufferSizes;
@@ -24,6 +27,7 @@ public class MainBufferSplayNet {
         double p;
         int n;
         int seq;
+        double starvation = -1.0;
         public DataParameter(double a, double p, int n, int seq){
             this.a = a;
             this.p = p;
@@ -78,7 +82,8 @@ public class MainBufferSplayNet {
     public static void simulation(Scanner s) throws Exception {
         File folder = new File("./csvExperiment");
         File[] listOfFiles = folder.listFiles();
-        List<Integer> bufferSizes = getBuffersizeQuestionaire(s);
+        List<Integer> bufferSizes = getBuffersizeQuestionnaire(s);
+        List<Double> starvation_parameters = getStarvationParametersQuestionnaire(s);
         assert listOfFiles != null;
         for (File file: listOfFiles){
             String[] k = file.getAbsolutePath().split("-");
@@ -86,7 +91,11 @@ public class MainBufferSplayNet {
             List<SplayNet.CommunicatingNodes> inputPairs = simulationGetCSVdata(file.getAbsolutePath());
             SplaynetParameters parameters = new SplaynetParameters(bufferSizes, inputPairs);
             System.out.printf("Dataset (a = %f, p = %f, n = %d, seq = %d):\n", dataP.a, dataP.p, dataP.n, dataP.seq);
-            writeToTxt(runExperiment(parameters, false, 0), 0, dataP);
+            for (Double parameter: starvation_parameters){
+                if (starvation_parameters.size() > 1) dataP.starvation = parameter;
+                starvationParameter = parameter;
+                writeToTxt(runExperiment(parameters, false, 0), 0, dataP);
+            }
             //writeToTxt(runExperiment(parameters, false, 1), 1, dataP);
             //writeToTxt(runExperiment(parameters, false, 2), 2, dataP);
             //writeToTxt(runExperiment(parameters, false, 3), 3, dataP);
@@ -111,11 +120,12 @@ public class MainBufferSplayNet {
             if (printLogs) System.out.println("input tree:");
             if (printLogs) sn_current.printPreorder(sn_current.getRoot());
             if (printLogs) System.out.println();
-            sn_current.setTimestamps(0, System.nanoTime());
+            sn_current.setTimestamps(0, timestamp++);
             long start = System.nanoTime();
             if (algorithm == 0 || algorithm == 1){
                 runExperimentDistanceSplaynet(sn_current, bufferSize, algorithm, parameters.nodeRequestPairs, printLogs);
                 timestampCollector[index++] = Arrays.copyOfRange(sn_current.getAllTimestamps(), 1, sn_current.getAllTimestamps().length);
+                timestamp = 0;
             }else if (algorithm > 1){
                 runExperimentClusterSplaynet(sn_current, bufferSize, parameters.nodeRequestPairs, printLogs, algorithm);
             }
@@ -126,7 +136,6 @@ public class MainBufferSplayNet {
             if (printLogs) System.out.println("Final tree:");
             if (printLogs) sn_current.printPreorder(sn_current.getRoot());
             if (printLogs) System.out.println();
-            //if (printLogs) BTreePrinter.printNode(transform(sn_current));
             results.add(new Result(bufferSize, sn_current.getServiceCost(), sn_current.getRotationCost(), sn_current.partitions, sn_current.clusters, end-start));
         }
         return results;
@@ -143,7 +152,7 @@ public class MainBufferSplayNet {
         sn1.setBuffer(buffer);
         for (SplayNet.CommunicatingNodes element: nodeRequestPairs){
             if (buffer.isSpace()){
-                buffer.increaseTimestamp();
+                //buffer.increaseTimestamp();
                 Buffer.BufferNodePair x = new Buffer.BufferNodePair(element);
                 buffer.addListBufferNodePairs(x);
             }else{
@@ -206,7 +215,7 @@ public class MainBufferSplayNet {
         sn1.increaseServingCost(popNode.getDistance());
         sn1.commute(popNode.nodePair.getU(), popNode.nodePair.getV());
 
-        sn1.setTimestamps(popNode.getNodePair().getId(), System.nanoTime()-sn1.getTimestamp(0));
+        sn1.setTimestamps(popNode.getNodePair().getId(), timestamp++);
         buffer.increaseTimestamp();
         if (printLogs) System.out.println("Zwischenstand:");
         if (printLogs) sn1.printPreorder(sn1.getRoot());
@@ -275,12 +284,12 @@ public class MainBufferSplayNet {
         } else {
             throw new Exception("wront Input");
         }
-        List<Integer> bufferSizes = getBuffersizeQuestionaire(s);
+        List<Integer> bufferSizes = getBuffersizeQuestionnaire(s);
         return new SplaynetParameters(bufferSizes, inputPairs);
     }
 
-    public static List<Integer> getBuffersizeQuestionaire(Scanner s) throws Exception {
-        System.out.println("Do you want to select custom Buffersizes (Default: 1, 8, 32, 128, 512, 1024)?");
+    public static List<Integer> getBuffersizeQuestionnaire(Scanner s) throws Exception {
+        System.out.println("Do you want to select custom Buffersizes (Default: 1, 8, 32, 128, 512, 1024, 2048)?");
         String str = s.next();
         List<Integer> bufferSizes;
         if (str.equalsIgnoreCase("N")) {
@@ -295,6 +304,20 @@ public class MainBufferSplayNet {
         return bufferSizes;
     }
 
+    public static List<Double> getStarvationParametersQuestionnaire(Scanner s) throws Exception {
+        System.out.println("Do you want to test default starvation parameters (0.0,0.1,...,1.0)?");
+        String str = s.next();
+        List<Double> para;
+        if (str.equalsIgnoreCase("Y")) {
+            para = new ArrayList<>(List.of(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0));
+        } else if (str.equalsIgnoreCase("N")){
+            para = new ArrayList<>(List.of(0.5));
+        } else {
+            throw new Exception("wront Input");
+        }
+        return para;
+    }
+
     public static List<Integer> getIntegerListInput(Scanner s, int length){
         List<Integer> nodeList = new ArrayList<>();
         for (int i = 0; i < length; i++) {
@@ -305,13 +328,14 @@ public class MainBufferSplayNet {
     }
 
     public static void writeToTxt(ArrayList<Result> results, int algorithm, DataParameter dataP){
-        if (algorithm == 0){
+        if (algorithm == 0 && dataP.starvation != -1.0){
             try {
-                String path = "./../results/result-" + algorithm + "-" + "n" + dataP.n + "-seq" + dataP.seq + "-a" + dataP.a + "-p" + dataP.p + "-ts" + ".txt";
+                String path = "./../results/result-" + algorithm + "-" + "n" + dataP.n + "-seq" + dataP.seq + "-a" + dataP.a + "-p" + dataP.p + "-st" + dataP.starvation + "-ts" + ".txt";
 
                 FileWriter myWriter = new FileWriter(path);
                 for (int idx = 0; idx < results.size(); idx++){
-                    myWriter.write(String.valueOf(results.get(idx).bufferSize));
+                    myWriter.write(results.get(idx).bufferSize + ",");
+                    myWriter.write(String.valueOf((results.get(idx).serviceCost + results.get(idx).rotationCost)));
                     for (int k = 0; k < timestampCollector[idx].length; k++){
                         myWriter.write("," + timestampCollector[idx][k]);
                     }
@@ -324,8 +348,13 @@ public class MainBufferSplayNet {
             }
         }
         try {
-            String path = "./../results/result-" + algorithm + "-" + "n" + dataP.n + "-seq" + dataP.seq + "-a" + dataP.a + "-p" + dataP.p + ".txt";
+            String path;
+            if (dataP.starvation != -1.0){
+                path = "./../results/result-" + algorithm + "-" + "n" + dataP.n + "-seq" + dataP.seq + "-a" + dataP.a + "-p" + dataP.p + "-st" + dataP.starvation + ".txt";
+            }else{
+                path = "./../results/result-" + algorithm + "-" + "n" + dataP.n + "-seq" + dataP.seq + "-a" + dataP.a + "-p" + dataP.p + ".txt";
 
+            }
             FileWriter myWriter = new FileWriter(path);
             myWriter.write(dataP.n + "," + dataP.seq + "," + dataP.a + "," + dataP.p +"\n");
 
@@ -337,6 +366,14 @@ public class MainBufferSplayNet {
             System.out.println("An error occurred while writing a File");
             e.printStackTrace();
         }
+    }
+
+    public static long sum(long[] list) {
+        long sum = 0;
+        for (long i: list) {
+            sum += i;
+        }
+        return sum;
     }
 
     public static Node transform(SplayNet net){

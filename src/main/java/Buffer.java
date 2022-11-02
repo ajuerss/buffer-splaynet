@@ -48,7 +48,7 @@ public class Buffer {
     public static class BufferNodePair{
         SplayNet.CommunicatingNodes nodePair;
         private int distance;
-        private int priority;
+        private double priority;
         private int timestamp;
 
         public BufferNodePair(SplayNet.CommunicatingNodes commNodes){
@@ -62,7 +62,7 @@ public class Buffer {
         public int getV(){
             return this.nodePair.getV();
         }
-        public int getPriority() {
+        public double getPriority() {
             return this.priority;
         }
 
@@ -90,12 +90,12 @@ public class Buffer {
             if (element.distance == 0){
                 element.distance = usedNet.calculateDistance((listBufferNodePairs.size() == 1), element.nodePair.getU(), element.nodePair.getV());
             }
-            element.priority = element.distance + element.timestamp;
+            element.priority = element.distance - MainBufferSplayNet.starvationParameter*element.timestamp;
             if (element.distance == 1){
                 fullBuffer = false;
                 if (printLogs) System.out.printf("%d and %d with dist 1 served\n", element.nodePair.getU(), element.nodePair.getV());
                 elementsToRemove.add(element);
-                this.usedNet.setTimestamps(element.getNodePair().getId(), System.nanoTime()-usedNet.getTimestamp(0));
+                this.usedNet.setTimestamps(element.getNodePair().getId(), MainBufferSplayNet.timestamp++);
             }
         }
         if (elementsToRemove.size() > 0){
@@ -216,7 +216,7 @@ public class Buffer {
                 fullBuffer = false;
                 if (printLogs) System.out.printf("%d and %d with dist 1 served\n", element.nodePair.getU(), element.nodePair.getV());
                 this.usedNet.increaseServingCost(1);
-                this.usedNet.setTimestamps(element.getNodePair().getId(), System.nanoTime()-usedNet.getTimestamp(0));
+                this.usedNet.setTimestamps(element.getNodePair().getId(), MainBufferSplayNet.timestamp++);
                 servedElements.add(element);
             }
         }
