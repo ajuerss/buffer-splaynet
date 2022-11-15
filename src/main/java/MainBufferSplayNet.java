@@ -10,8 +10,8 @@ public class MainBufferSplayNet {
 
     public static long[][] timestampCollector;
     public static long timestamp = 0;
-
     public static double starvationParameter = 0.5;
+    public static boolean starvationSimulation = false;
 
     private static class SplaynetParameters {
         List<Integer> bufferSizes;
@@ -91,12 +91,12 @@ public class MainBufferSplayNet {
             List<SplayNet.CommunicatingNodes> inputPairs = simulationGetCSVdata(file.getAbsolutePath());
             SplaynetParameters parameters = new SplaynetParameters(bufferSizes, inputPairs);
             System.out.printf("Dataset (a = %f, p = %f, n = %d, seq = %d):\n", dataP.a, dataP.p, dataP.n, dataP.seq);
+            writeToTxt(runExperiment(parameters, false, 0), 0, dataP);
             for (Double parameter: starvation_parameters){
                 if (starvation_parameters.size() > 1) dataP.starvation = parameter;
                 starvationParameter = parameter;
-                writeToTxt(runExperiment(parameters, false, 0), 0, dataP);
+                //writeToTxt(runExperiment(parameters, false, 1), 1, dataP);
             }
-            //writeToTxt(runExperiment(parameters, false, 1), 1, dataP);
             //writeToTxt(runExperiment(parameters, false, 2), 2, dataP);
             //writeToTxt(runExperiment(parameters, false, 3), 3, dataP);
             //writeToTxt(runExperiment(parameters, false, 4), 4, dataP);
@@ -157,8 +157,8 @@ public class MainBufferSplayNet {
                 buffer.addListBufferNodePairs(x);
             }else{
                 if(buffer.calcPriority(printLogs)){
-                    if (algorithm == 0) popElementFromBuffer(buffer, printLogs, sn1, false);
-                    if (algorithm == 1) popElementFromBuffer(buffer, printLogs, sn1, true);
+                    if (algorithm == 0) popElementFromBuffer(buffer, printLogs, sn1, true);
+                    if (algorithm == 1) popElementFromBuffer(buffer, printLogs, sn1, false);
                 }
                 Buffer.BufferNodePair x = new Buffer.BufferNodePair(element);
                 buffer.addListBufferNodePairs(x);
@@ -168,8 +168,8 @@ public class MainBufferSplayNet {
         while (!buffer.getListBufferNodePairs().isEmpty()){
             buffer.calcPriority(printLogs);
             if(!buffer.getListBufferNodePairs().isEmpty()){
-                if (algorithm == 0) popElementFromBuffer(buffer, printLogs, sn1, false);
-                if (algorithm == 1) popElementFromBuffer(buffer, printLogs, sn1, true);
+                if (algorithm == 0) popElementFromBuffer(buffer, printLogs, sn1, true);
+                if (algorithm == 1) popElementFromBuffer(buffer, printLogs, sn1, false);
             }
         }
     }
@@ -305,13 +305,22 @@ public class MainBufferSplayNet {
     }
 
     public static List<Double> getStarvationParametersQuestionnaire(Scanner s) throws Exception {
-        System.out.println("Do you want to test default starvation parameters (0.0,0.1,...,1.0)?");
+        System.out.println("Do you want to track timestamps?");
         String str = s.next();
         List<Double> para;
         if (str.equalsIgnoreCase("Y")) {
-            para = new ArrayList<>(List.of(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0));
+            starvationSimulation = true;
+            System.out.println("Do you want to test multiple starvation parameters (0.0,0.1,...,1.0)?");
+            String str1 = s.next();
+            if (str1.equalsIgnoreCase("Y")) {
+                para = new ArrayList<>(List.of(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0));
+            } else if (str1.equalsIgnoreCase("N")){
+                para = new ArrayList<>(List.of(0.2));
+            } else {
+                throw new Exception("wront Input");
+            }
         } else if (str.equalsIgnoreCase("N")){
-            para = new ArrayList<>(List.of(0.5));
+            para = new ArrayList<>(List.of(0.2));
         } else {
             throw new Exception("wront Input");
         }
@@ -328,8 +337,12 @@ public class MainBufferSplayNet {
     }
 
     public static void writeToTxt(ArrayList<Result> results, int algorithm, DataParameter dataP){
-        if (algorithm == 0 && dataP.starvation != -1.0){
+        System.out.println(algorithm);
+        System.out.println(dataP.starvation);
+        System.out.println(starvationSimulation);
+        if ((algorithm == 0 || algorithm == 1) && (dataP.starvation != -1.0 || starvationSimulation)){
             try {
+                System.out.println("hayat");
                 String path = "./../results/result-" + algorithm + "-" + "n" + dataP.n + "-seq" + dataP.seq + "-a" + dataP.a + "-p" + dataP.p + "-st" + dataP.starvation + "-ts" + ".txt";
 
                 FileWriter myWriter = new FileWriter(path);
@@ -342,6 +355,7 @@ public class MainBufferSplayNet {
                     myWriter.write("\n");
                 }
                 myWriter.close();
+                System.out.println("hayat");
             } catch (IOException e) {
                 System.out.println("An error occurred while writing a File");
                 e.printStackTrace();

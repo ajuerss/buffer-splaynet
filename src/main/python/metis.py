@@ -1,5 +1,3 @@
-import sys
-import numpy as np
 import pymetis
 import json
 
@@ -30,3 +28,4 @@ if __name__ == '__main__':
     person_dict = {'array': membership, 'cuts': prop_cuts}
     with open('./../buffer-splaynet/json/output.json', 'w') as w:
         json.dump(person_dict, w)
+    print('done')

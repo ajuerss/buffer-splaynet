@@ -85,7 +85,7 @@ public class Part_Graph {
             matrix.get(dic.get(element.nodePair.getV())).add(dic.get(element.nodePair.getU()));
         }
         writeInJSON(matrix, maxComponentSize);
-        Process process = Runtime.getRuntime().exec("python3 src/main/java/metis.py");
+        Process process = Runtime.getRuntime().exec("python3 src/main/python/louvain.py");
 
         BufferedReader stdInput = new BufferedReader(new InputStreamReader(process.getInputStream()));
         String output = stdInput.readLine();
@@ -185,13 +185,13 @@ public class Part_Graph {
                 System.out.println();
             }
         }
-
+        /*
         for (ArrayList<Buffer.BufferNodePair> element: newList){
             if (element.size() <= 0){
                 throw new Exception("leere liste wird hinzugefügt");
             }
         }
-
+        */
         return newList;
     }
 
