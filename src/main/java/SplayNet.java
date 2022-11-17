@@ -418,18 +418,20 @@ public class SplayNet {
     }
 
     public void printPreorder (Node node){
-        if (node == null) {
-            return;
+        if(MainBufferSplayNet.log){
+            if (node == null) {
+                return;
+            }
+            int left = 0;
+            int right = 0;
+            int parent = 0;
+            if (node.right != null) right = node.right.key;
+            if (node.left != null) left = node.left.key;
+            if (node.parent != null) parent = node.parent.key;
+            System.out.printf("Node %d has left Child: %d and right Child: %d and Parent: %d... lastleft %d lastright %d\n", node.key, left, right, parent, node.lastLeftParent, node.lastRightParent);
+            printPreorder(node.left);
+            printPreorder(node.right);
         }
-        int left = 0;
-        int right = 0;
-        int parent = 0;
-        if (node.right != null) right = node.right.key;
-        if (node.left != null) left = node.left.key;
-        if (node.parent != null) parent = node.parent.key;
-        System.out.printf("Node %d has left Child: %d and right Child: %d and Parent: %d... lastleft %d lastright %d\n", node.key, left, right, parent, node.lastLeftParent, node.lastRightParent);
-        printPreorder(node.left);
-        printPreorder(node.right);
     }
 
     private Node splay (Node h, int key) throws Exception {

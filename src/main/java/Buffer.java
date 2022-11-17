@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 public class Buffer {
     private final SplayNet usedNet;
     private final int bufferSize;
+    private List<SplayNet.CommunicatingNodes> traceOrder = new ArrayList<>();
 
     private List<BufferNodePair> listBufferNodePairs = new ArrayList<>();
     private List<RequestCount> edgeListCounted = new ArrayList<>();
@@ -16,6 +17,9 @@ public class Buffer {
     public void addListBufferNodePairs(BufferNodePair element){this.listBufferNodePairs.add(element);}
     public int getBufferSize(){ return this.bufferSize;}
     public void removeListBufferNodePairs(int x){ this.listBufferNodePairs.remove(x);}
+    public void modifiedTraceOrderAdd(SplayNet.CommunicatingNodes pair){this.traceOrder.add(pair);}
+
+    public List<SplayNet.CommunicatingNodes> getTraceOrder(){return this.traceOrder;}
 
     public Buffer (SplayNet inputNet, int bufferSize){
         this.usedNet = inputNet;
@@ -83,9 +87,9 @@ public class Buffer {
         }
     }
 
-    public boolean calcPriority(boolean printLogs) throws Exception {
+    public boolean calcPriority() throws Exception {
         boolean fullBuffer = true;
-        ArrayList<BufferNodePair> elementsToRemove = new ArrayList<>();
+        ArrayList<BufferNodePair> servedElements = new ArrayList<>();
         for (BufferNodePair element: listBufferNodePairs){
             if (element.distance == 0){
                 element.distance = usedNet.calculateDistance((listBufferNodePairs.size() == 1), element.nodePair.getU(), element.nodePair.getV());
@@ -93,14 +97,15 @@ public class Buffer {
             element.priority = element.distance - MainBufferSplayNet.starvationParameter*element.timestamp;
             if (element.distance == 1){
                 fullBuffer = false;
-                if (printLogs) System.out.printf("%d and %d with dist 1 served\n", element.nodePair.getU(), element.nodePair.getV());
-                elementsToRemove.add(element);
+                MainBufferSplayNet.printLogs(String.format("%d and %d with dist 1 served\n", element.nodePair.getU(), element.nodePair.getV()));
+                servedElements.add(element);
+                this.modifiedTraceOrderAdd(new SplayNet.CommunicatingNodes(0,element.getU(), element.getV()));
                 this.usedNet.setTimestamps(element.getNodePair().getId(), MainBufferSplayNet.timestamp++);
             }
         }
-        if (elementsToRemove.size() > 0){
-            this.usedNet.increaseServingCost(elementsToRemove.size());
-            for(BufferNodePair element: elementsToRemove){
+        if (servedElements.size() > 0){
+            this.usedNet.increaseServingCost(servedElements.size());
+            for(BufferNodePair element: servedElements){
                 this.listBufferNodePairs.remove(element);
             }
         }
@@ -204,8 +209,8 @@ public class Buffer {
                 .sorted(Comparator.comparing(BufferNodePair::getPriority))
                 .collect(Collectors.toList());
     }
-
-    public boolean calcDistance(boolean printLogs) throws Exception {
+    /*
+    public boolean calcDistance() throws Exception {
         boolean fullBuffer = true;
         ArrayList<BufferNodePair> servedElements = new ArrayList<>();
         for (BufferNodePair element: listBufferNodePairs){
@@ -214,7 +219,7 @@ public class Buffer {
             }
             if (element.distance == 1){
                 fullBuffer = false;
-                if (printLogs) System.out.printf("%d and %d with dist 1 served\n", element.nodePair.getU(), element.nodePair.getV());
+                MainBufferSplayNet.printLogs(String.format("%d and %d with dist 1 served\n", element.nodePair.getU(), element.nodePair.getV()));
                 this.usedNet.increaseServingCost(1);
                 this.usedNet.setTimestamps(element.getNodePair().getId(), MainBufferSplayNet.timestamp++);
                 servedElements.add(element);
@@ -223,9 +228,10 @@ public class Buffer {
         this.listBufferNodePairs.removeAll(servedElements);
         return fullBuffer;
     }
+     */
 
-    public void startClustering(boolean printLogs, int algorithm) throws Exception {
-        ArrayList<ArrayList<Integer>> components = getClusters(this.listBufferNodePairs, printLogs);
+    public void startClustering(int algorithm) throws Exception {
+        ArrayList<ArrayList<Integer>> components = getClusters(this.listBufferNodePairs);
         for(ArrayList<Integer> element: components){
             ArrayList<BufferNodePair> newComponent = new ArrayList<>();
             for(Integer node: element){
@@ -243,10 +249,10 @@ public class Buffer {
             double factor = ((2*n-4)/(((n*n-n)/2)-1))/a;
             double maxComponentSize = factor*n;
             if(element.size() > maxComponentSize){
-                if (printLogs) System.out.println("partitioning component");
+                MainBufferSplayNet.printLogs("partitioning component");
                 this.usedNet.clusters++;
                 this.usedNet.partitions++;
-                this.edgeList.addAll(Part_Graph.call_part_graph(newComponent, maxComponentSize, printLogs));
+                this.edgeList.addAll(Part_Graph.call_part_graph(newComponent, maxComponentSize));
             }else{
                 this.usedNet.clusters++;
                 this.edgeList.add(newComponent);
@@ -277,11 +283,11 @@ public class Buffer {
             if (element.size() > 0) throw new Exception("element.size() bigger than one");
             if (this.edgeListCounted.size() > 0){
                 if (algorithm == 2){
-                    prioritizeInClustersDistance(printLogs);
+                    prioritizeInClustersDistance();
                 }else if (algorithm == 3){
-                    prioritizeInClustersEdgeWeight(printLogs);
+                    prioritizeInClustersEdgeWeight();
                 }else if (algorithm == 4){
-                    prioritizeInClustersNodeByNode(printLogs);
+                    prioritizeInClustersNodeByNode();
                 }else{
                     throw new Exception("wrong priority");
                 }
@@ -292,20 +298,22 @@ public class Buffer {
 
     }
 
-    public void prioritizeInClustersDistance(boolean printLogs) throws Exception {
+    public void prioritizeInClustersDistance() throws Exception {
         this.edgeListCounted = this.edgeListCounted.stream()
                 .sorted(Comparator.comparing(RequestCount::getDistance))
                 .collect(Collectors.toList());
-
         for (RequestCount request: this.edgeListCounted){
-            if (printLogs) System.out.printf("Request %d-%d with distance %d, %d times\n", request.u, request.v, request.distance, request.count);
+            MainBufferSplayNet.printLogs(String.format("Request %d-%d with distance %d, %d times\n", request.u, request.v, request.distance, request.count));
             this.usedNet.increaseServingCost(request.distance);
             if (request.count > 1) this.usedNet.increaseServingCost(request.count-1);
+            for(int a = 0; a < request.count; a++){
+                this.modifiedTraceOrderAdd(new SplayNet.CommunicatingNodes(0,request.u, request.v));
+            }
             this.usedNet.commute(request.u, request.v);
         }
     }
 
-    public void prioritizeInClustersNodeByNode(boolean printLogs) throws Exception {
+    public void prioritizeInClustersNodeByNode() throws Exception {
         int node = this.edgeListCounted.get(0).u;
         while(this.edgeListCounted.size() != 0){
             int nextNode = 0;
@@ -317,9 +325,12 @@ public class Buffer {
                     }else{
                         nextNode = request.u;
                     }
-                    if (printLogs) System.out.printf("Request %d-%d with distance %d, %d times\n", request.u, request.v, request.distance, request.count);
+                    MainBufferSplayNet.printLogs(String.format("Request %d-%d with distance %d, %d times\n", request.u, request.v, request.distance, request.count));
                     this.usedNet.increaseServingCost(request.distance);
                     if (request.count > 1) this.usedNet.increaseServingCost(request.count-1);
+                    for(int a = 0; a < request.count; a++){
+                        this.modifiedTraceOrderAdd(new SplayNet.CommunicatingNodes(0,request.u, request.v));
+                    }
                     this.usedNet.commute(request.u, request.v);
                     servedNodes.add(request);
                 }
@@ -334,14 +345,18 @@ public class Buffer {
         }
     }
 
-    public void prioritizeInClustersEdgeWeight(boolean printLogs) throws Exception {
+    public void prioritizeInClustersEdgeWeight() throws Exception {
         this.edgeListCounted = this.edgeListCounted.stream()
                 .sorted(Comparator.comparing(RequestCount::getCount))
                 .collect(Collectors.toList());
+        Collections.reverse(this.edgeListCounted);
         for (RequestCount request: this.edgeListCounted){
-            if (printLogs) System.out.printf("Request %d-%d with distance %d, %d times\n", request.u, request.v, request.distance, request.count);
+            MainBufferSplayNet.printLogs(String.format("Request %d-%d with distance %d, %d times\n", request.u, request.v, request.distance, request.count));
             this.usedNet.increaseServingCost(request.distance);
             if (request.count > 1) this.usedNet.increaseServingCost(request.count-1);
+            for(int a = 0; a < request.count; a++){
+                this.modifiedTraceOrderAdd(new SplayNet.CommunicatingNodes(0,request.u, request.v));
+            }
             this.usedNet.commute(request.u, request.v);
         }
     }
@@ -355,7 +370,7 @@ public class Buffer {
         return list;
     }
 
-    public static ArrayList<ArrayList<Integer>> getClusters(List<BufferNodePair> edges, boolean printLogs){
+    public static ArrayList<ArrayList<Integer>> getClusters(List<BufferNodePair> edges){
         SimpleGraph<String, DefaultEdge> graph = new SimpleGraph<String, DefaultEdge>(DefaultEdge.class);
         for (BufferNodePair element: edges){
             String node1 = String.valueOf(element.nodePair.getU());
@@ -364,10 +379,10 @@ public class Buffer {
             graph.addVertex(node2);
             graph.addEdge(node1, node2);
         }
-        if (printLogs) System.out.println("start clust");
+        MainBufferSplayNet.printLogs("start clust");
         KSpanningTreeClustering<String, DefaultEdge> cluster = new KSpanningTreeClustering<>(graph, 1);
         List<Set<String>> x = cluster.getClustering().getClusters();
-        if (printLogs) System.out.println(x);
+        MainBufferSplayNet.printLogs(String.valueOf(x));
         ArrayList<ArrayList<Integer>> intClust = new ArrayList<>();
         for (Set<String> element: x){
             ArrayList<Integer> arr = new ArrayList<>();

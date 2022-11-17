@@ -1,17 +1,49 @@
+import org.json.simple.JSONObject;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Scanner;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.*;
 
 public class MainBufferSplayNet {
 
     public static long[][] timestampCollector;
+    public static List<DatasetTraces> traceCollection = new ArrayList<>();
     public static long timestamp = 0;
     public static double starvationParameter = 0.5;
     public static boolean starvationSimulation = false;
+
+    public static boolean log = false;
+
+    public static void printLogs(String message){
+        if (log) System.out.println(message);
+    }
+
+
+    public static class DatasetTraces {
+        public String name;
+        public List<BufferTraces> regroupingTrace = new ArrayList<>();
+        public List<BufferTraces> distanceTrace = new ArrayList<>();
+        public List<BufferTraces> clusterNodeByNodeTrace = new ArrayList<>();
+        public List<BufferTraces> clusterDistanceTrace = new ArrayList<>();
+        public List<BufferTraces> clusterEdgeWeightTrace = new ArrayList<>();
+        public List<List<BufferTraces>> allTraces = Arrays.asList(regroupingTrace, distanceTrace, clusterNodeByNodeTrace, clusterDistanceTrace, clusterEdgeWeightTrace);
+
+        public DatasetTraces(String name) {
+            this.name = name;
+        }
+
+    }
+    public static class BufferTraces {
+        private final int buffersize;
+        private List<SplayNet.CommunicatingNodes> modifiedTrace = new ArrayList<>();
+
+        public BufferTraces(int buffersize) {
+            this.buffersize = buffersize;
+        }
+    }
 
     private static class SplaynetParameters {
         List<Integer> bufferSizes;
@@ -33,6 +65,10 @@ public class MainBufferSplayNet {
             this.p = p;
             this.n = n;
             this.seq = seq;
+        }
+
+        public String getDatasetName(){
+            return "result" + "-" + "n" + this.n + "-seq" + this.seq + "-a" + this.a + "-p" + this.p;
         }
     }
 
@@ -65,15 +101,16 @@ public class MainBufferSplayNet {
             simulation(s);
         } else if (n.equalsIgnoreCase("N")){
             // declare where logs of current iterations of the toplogy are needed
-            boolean printLogs = printLogQuestionaire(s);
+            log = printLogQuestionaire(s);
             // get parameters for Experiment (Buffersize and Communication pairs). The Splaynet tree will be initialized
             SplaynetParameters parameters = useParametersQuestionaire(s);
-
-            runExperiment(parameters, printLogs, 0);
-            //runExperiment(parameters, printLogs, 1);
-            //runExperiment(parameters, printLogs, 2);
-            //runExperiment(parameters, printLogs, 3);
-            //runExperiment(parameters, printLogs, 4);
+            DatasetTraces datasetTrace = new DatasetTraces("trace");
+            traceCollection.add(datasetTrace);
+            runExperiment(parameters, 0);
+            runExperiment(parameters, 1);
+            runExperiment(parameters, 2);
+            runExperiment(parameters, 3);
+            runExperiment(parameters, 4);
         } else {
             throw new Exception("wrong input");
         }
@@ -88,28 +125,46 @@ public class MainBufferSplayNet {
         for (File file: listOfFiles){
             String[] k = file.getAbsolutePath().split("-");
             DataParameter dataP = new DataParameter(Double.parseDouble(k[5].substring(1)),Double.parseDouble(k[6].substring(1, 4)),Integer. parseInt(k[3].substring(1)),Integer. parseInt(k[4].substring(3)));
+            DatasetTraces datasetTrace = new DatasetTraces(dataP.getDatasetName());
+            traceCollection.add(datasetTrace);
             List<SplayNet.CommunicatingNodes> inputPairs = simulationGetCSVdata(file.getAbsolutePath());
+            SplayNet.CommunicatingNodes old = inputPairs.get(0);
+            int total = 0;
+            int p = 0;
+            for(SplayNet.CommunicatingNodes element: inputPairs){
+                if (element.getU() == old.getU() && element.getV() == old.getV()) p++;
+                old = element;
+                total++;
+            }
+            System.out.println("Temporal locality: " + p + "/" + total);
             SplaynetParameters parameters = new SplaynetParameters(bufferSizes, inputPairs);
             System.out.printf("Dataset (a = %f, p = %f, n = %d, seq = %d):\n", dataP.a, dataP.p, dataP.n, dataP.seq);
-            writeToTxt(runExperiment(parameters, false, 0), 0, dataP);
+            //writeToTxt(runExperiment(parameters, 0), 0, dataP);
             for (Double parameter: starvation_parameters){
                 if (starvation_parameters.size() > 1) dataP.starvation = parameter;
                 starvationParameter = parameter;
-                //writeToTxt(runExperiment(parameters, false, 1), 1, dataP);
+                //writeToTxt(runExperiment(parameters,  1), 1, dataP);
             }
-            //writeToTxt(runExperiment(parameters, false, 2), 2, dataP);
-            //writeToTxt(runExperiment(parameters, false, 3), 3, dataP);
-            //writeToTxt(runExperiment(parameters, false, 4), 4, dataP);
+            //writeToTxt(runExperiment(parameters,  2), 2, dataP);
+            //writeToTxt(runExperiment(parameters,  3), 3, dataP);
+            writeToTxt(runExperiment(parameters,  4), 4, dataP);
         }
+        createTraceJSON();
     }
 
-    public static ArrayList<Result> runExperiment(SplaynetParameters parameters, boolean printLogs, int algorithm) throws Exception {
+    public static ArrayList<Result> runExperiment(SplaynetParameters parameters, int algorithm) throws Exception {
         // run experiment with Buffer(Distance Algorithm) on Splaynet
         ArrayList<Result> results = new ArrayList<>();
         // monitor results for each Buffersize
         int index = 0;
          timestampCollector = new long[parameters.bufferSizes.size()][parameters.nodeRequestPairs.size()];
         for (Integer bufferSize: parameters.bufferSizes){
+            BufferTraces bufferTraces = new BufferTraces(bufferSize);
+            if (algorithm == 0) traceCollection.get(traceCollection.size()-1).regroupingTrace.add(bufferTraces);
+            if (algorithm == 1) traceCollection.get(traceCollection.size()-1).distanceTrace.add(bufferTraces);
+            if (algorithm == 2) traceCollection.get(traceCollection.size()-1).clusterDistanceTrace.add(bufferTraces);
+            if (algorithm == 3) traceCollection.get(traceCollection.size()-1).clusterEdgeWeightTrace.add(bufferTraces);
+            if (algorithm == 4) traceCollection.get(traceCollection.size()-1).clusterNodeByNodeTrace.add(bufferTraces);
             // Create and initialize Splaynet with Parameters
             SplayNet sn_current = new SplayNet();
             ArrayList<Integer> nodeList = CSVReader.extractNodes(parameters.nodeRequestPairs);
@@ -117,26 +172,27 @@ public class MainBufferSplayNet {
             sn_current.initializeTimestamps(parameters.nodeRequestPairs.size()+1);
             initializeSplaynet(sn_current, nodeList);
             sn_current.setInsertionOver();
-            if (printLogs) System.out.println("input tree:");
-            if (printLogs) sn_current.printPreorder(sn_current.getRoot());
-            if (printLogs) System.out.println();
+            printLogs("input tree:");
+            //sn_current.printPreorder(sn_current.getRoot());
+            printLogs("");
             sn_current.setTimestamps(0, timestamp++);
             long start = System.nanoTime();
             if (algorithm == 0 || algorithm == 1){
-                runExperimentDistanceSplaynet(sn_current, bufferSize, algorithm, parameters.nodeRequestPairs, printLogs);
+                runExperimentDistanceSplaynet(sn_current, bufferSize, algorithm, parameters.nodeRequestPairs);
                 timestampCollector[index++] = Arrays.copyOfRange(sn_current.getAllTimestamps(), 1, sn_current.getAllTimestamps().length);
                 timestamp = 0;
             }else if (algorithm > 1){
-                runExperimentClusterSplaynet(sn_current, bufferSize, parameters.nodeRequestPairs, printLogs, algorithm);
+                runExperimentClusterSplaynet(sn_current, bufferSize, parameters.nodeRequestPairs, algorithm);
             }
             long end = System.nanoTime();
             sn_current.setExecutionTime((end-start)/1000000);
             System.out.println("For Buffersize " + bufferSize + ":");
             System.out.println("ServingCost: " + sn_current.getServiceCost() + " RotationCost:" + sn_current.getRotationCost() + " partitions:" + sn_current.partitions + "/" + sn_current.clusters + " Time:" + sn_current.getExecutionTime());
-            if (printLogs) System.out.println("Final tree:");
-            if (printLogs) sn_current.printPreorder(sn_current.getRoot());
-            if (printLogs) System.out.println();
+            printLogs("Final tree:");
+            //sn_current.printPreorder(sn_current.getRoot());
+            printLogs("");
             results.add(new Result(bufferSize, sn_current.getServiceCost(), sn_current.getRotationCost(), sn_current.partitions, sn_current.clusters, end-start));
+
         }
         return results;
 
@@ -147,83 +203,96 @@ public class MainBufferSplayNet {
         sn.assignLastParents(sn.getRoot(), -1, Integer.MAX_VALUE);
     }
 
-    public static void runExperimentDistanceSplaynet(SplayNet sn1, int bufferSize, int algorithm, List<SplayNet.CommunicatingNodes> nodeRequestPairs, boolean printLogs) throws Exception {
+    public static void runExperimentDistanceSplaynet(SplayNet sn1, int bufferSize, int algorithm, List<SplayNet.CommunicatingNodes> nodeRequestPairs) throws Exception {
         Buffer buffer = new Buffer(sn1, bufferSize);
         sn1.setBuffer(buffer);
+
         for (SplayNet.CommunicatingNodes element: nodeRequestPairs){
             if (buffer.isSpace()){
                 //buffer.increaseTimestamp();
                 Buffer.BufferNodePair x = new Buffer.BufferNodePair(element);
                 buffer.addListBufferNodePairs(x);
             }else{
-                if(buffer.calcPriority(printLogs)){
-                    if (algorithm == 0) popElementFromBuffer(buffer, printLogs, sn1, true);
-                    if (algorithm == 1) popElementFromBuffer(buffer, printLogs, sn1, false);
+                if(buffer.calcPriority()){
+                    if (algorithm == 0) popElementFromBuffer(buffer, sn1, true);
+                    if (algorithm == 1) popElementFromBuffer(buffer, sn1, false);
                 }
                 Buffer.BufferNodePair x = new Buffer.BufferNodePair(element);
                 buffer.addListBufferNodePairs(x);
             }
-            if (printLogs) System.out.println("Incoming Request:" + element.getU() + " " + element.getV());
+            printLogs("Incoming Request:" + element.getU() + " " + element.getV());
         }
         while (!buffer.getListBufferNodePairs().isEmpty()){
-            buffer.calcPriority(printLogs);
+            buffer.calcPriority();
             if(!buffer.getListBufferNodePairs().isEmpty()){
-                if (algorithm == 0) popElementFromBuffer(buffer, printLogs, sn1, true);
-                if (algorithm == 1) popElementFromBuffer(buffer, printLogs, sn1, false);
+                if (algorithm == 0) popElementFromBuffer(buffer, sn1, true);
+                if (algorithm == 1) popElementFromBuffer(buffer, sn1, false);
             }
         }
+        if (algorithm == 0) getBufferTraces(traceCollection.get(traceCollection.size()-1).regroupingTrace, bufferSize).modifiedTrace = buffer.getTraceOrder();
+        if (algorithm == 1) getBufferTraces(traceCollection.get(traceCollection.size()-1).distanceTrace, bufferSize).modifiedTrace = buffer.getTraceOrder();
     }
 
-    public static void runExperimentClusterSplaynet(SplayNet sn1, int bufferSize, List<SplayNet.CommunicatingNodes> nodeRequestPairs, boolean printLogs, int algorithm) throws Exception {
+    public static void runExperimentClusterSplaynet(SplayNet sn1, int bufferSize, List<SplayNet.CommunicatingNodes> nodeRequestPairs, int algorithm) throws Exception {
         Buffer buffer = new Buffer(sn1, bufferSize);
         sn1.setBuffer(buffer);
         for (SplayNet.CommunicatingNodes element: nodeRequestPairs){
             if (buffer.isSpace()){
                 Buffer.BufferNodePair x = new Buffer.BufferNodePair(element);
                 buffer.addListBufferNodePairs(x);
-                if (printLogs) System.out.println("Incoming Request:" + element.getU() + " " + element.getV());
+                printLogs("Incoming Request:" + element.getU() + " " + element.getV());
             }else{
-                if (buffer.calcDistance(printLogs)){
+                if (buffer.calcPriority()){
                     assert buffer.getBufferSize() == buffer.getListBufferNodePairs().size();
-                    if (printLogs) System.out.println("Clustering buffer Start");
-                    buffer.startClustering(printLogs, algorithm);
+                    printLogs("Clustering buffer Start");
+                    buffer.startClustering(algorithm);
                 }
-                if (printLogs) sn1.printPreorder(sn1.getRoot());
+                sn1.printPreorder(sn1.getRoot());
                 Buffer.BufferNodePair x = new Buffer.BufferNodePair(element);
                 buffer.addListBufferNodePairs(x);
-                if (printLogs) System.out.println("Incoming Request:" + element.getU() + " " + element.getV());
+                printLogs("Incoming Request:" + element.getU() + " " + element.getV());
             }
         }
         while (!buffer.getListBufferNodePairs().isEmpty()){
-            if (buffer.calcDistance(printLogs)){
-                if (printLogs) System.out.println("Clustering buffer");
-                buffer.startClustering(printLogs, algorithm);
-                if (printLogs) System.out.println("Clustering buffer done");
+            if (buffer.calcPriority()){
+                printLogs("Clustering buffer");
+                buffer.startClustering(algorithm);
+                printLogs("Clustering buffer done");
             }
         }
+        if (algorithm == 2) getBufferTraces(traceCollection.get(traceCollection.size()-1).clusterDistanceTrace, bufferSize).modifiedTrace = buffer.getTraceOrder();
+        if (algorithm == 3) getBufferTraces(traceCollection.get(traceCollection.size()-1).clusterEdgeWeightTrace, bufferSize).modifiedTrace = buffer.getTraceOrder();
+        if (algorithm == 4) getBufferTraces(traceCollection.get(traceCollection.size()-1).clusterNodeByNodeTrace, bufferSize).modifiedTrace = buffer.getTraceOrder();
     }
 
-    public static void popElementFromBuffer(Buffer buffer, boolean printLogs, SplayNet sn1, boolean grouping) throws Exception {
+    public static void popElementFromBuffer(Buffer buffer, SplayNet sn1, boolean grouping) throws Exception {
         if (!grouping) buffer.sortByPriority();
-        if (printLogs) System.out.println("Elements in Buffer:");
+        printLogs("Elements in Buffer:");
+        /*
         for (Buffer.BufferNodePair k: buffer.getListBufferNodePairs()){
-            if (printLogs) System.out.printf("ID:%d U:%d V:%d P:%d DST:%d TS:%d\n", k.nodePair.getId(), k.nodePair.getU(), k.nodePair.getV(), k.getPriority(), k.getDistance(), k.getTimestamp());
+            printLogs(String.format("ID:%d U:%d V:%d P:%f DST:%d TS:%d\n", k.nodePair.getId(), k.nodePair.getU(), k.nodePair.getV(), k.getPriority(), k.getDistance(), k.getTimestamp()));
         }
+        */
         Buffer.BufferNodePair popNode = buffer.getListBufferNodePairs().get(0);
         buffer.removeListBufferNodePairs(0);
-        if (printLogs) System.out.printf("Served Requested %d and %d\n", popNode.nodePair.getU(), popNode.nodePair.getV());
+        buffer.modifiedTraceOrderAdd(popNode.nodePair);
+        printLogs(String.format("Served Requested %d and %d\n", popNode.nodePair.getU(), popNode.nodePair.getV()));
         sn1.increaseServingCost(popNode.getDistance());
         sn1.commute(popNode.nodePair.getU(), popNode.nodePair.getV());
 
         sn1.setTimestamps(popNode.getNodePair().getId(), timestamp++);
         buffer.increaseTimestamp();
-        if (printLogs) System.out.println("Zwischenstand:");
-        if (printLogs) sn1.printPreorder(sn1.getRoot());
-        if (printLogs) System.out.println("ServingCost: " + sn1.getServiceCost() + " RoutingCost:" + sn1.getRoutingCost() + " RotationCost:" + sn1.getRotationCost());
+        printLogs("Zwischenstand:");
+        sn1.printPreorder(sn1.getRoot());
+        printLogs("ServingCost: " + sn1.getServiceCost() + " RoutingCost:" + sn1.getRoutingCost() + " RotationCost:" + sn1.getRotationCost());
     }
 
     public static List<SplayNet.CommunicatingNodes> getCSVdata(long maxRequests) throws IOException {
-        String path = "./csvExperiment/zipf-dataset-N15-seq100-a1.0-p0.0.csv";
+        //String path = "./csvExperiment/zipf-dataset-N15-seq100-a1.0-p0.0.csv";
+        File folder = new File("./csvExperiment");
+        File[] listOfFiles = folder.listFiles();
+        assert listOfFiles != null;
+        String path = listOfFiles[0].getAbsolutePath();
         return CSVReader.readCSV(path, maxRequests);
     }
 
@@ -337,9 +406,6 @@ public class MainBufferSplayNet {
     }
 
     public static void writeToTxt(ArrayList<Result> results, int algorithm, DataParameter dataP){
-        System.out.println(algorithm);
-        System.out.println(dataP.starvation);
-        System.out.println(starvationSimulation);
         if ((algorithm == 0 || algorithm == 1) && (dataP.starvation != -1.0 || starvationSimulation)){
             try {
                 System.out.println("hayat");
@@ -390,14 +456,14 @@ public class MainBufferSplayNet {
         return sum;
     }
 
-    public static Node transform(SplayNet net){
+    public static Node<Integer> transform(SplayNet net){
         Node<Integer> x = new Node<>(net.getRoot().getKey());
         x.left = iterate(net.getRoot().getLeft());
         x.right = iterate(net.getRoot().getRight());
         return x;
     }
 
-    public static Node iterate(SplayNet.Node node){
+    public static Node<Integer> iterate(SplayNet.Node node){
         if (node == null){
             return null;
         }else{
@@ -406,5 +472,41 @@ public class MainBufferSplayNet {
             x.right = iterate(node.getRight());
             return x;
         }
+    }
+
+    public static BufferTraces getBufferTraces(List<BufferTraces> list, int buffersize) throws Exception {
+        for (BufferTraces bufferTraces : list) {
+            if (bufferTraces.buffersize == buffersize) return bufferTraces;
+        }
+        throw new Exception("Buffersize of dataset not found in trace object");
+    }
+
+    public static void createTraceJSON() throws IOException {
+        JSONObject dataset = new JSONObject();
+        for (DatasetTraces d: traceCollection){
+            int index = 0;
+            for (List<BufferTraces> a: d.allTraces){
+                for(BufferTraces b: a){
+                    String traceString = createTraceString(b.modifiedTrace);
+                    JSONObject x = new JSONObject();
+                    JSONObject y = new JSONObject();
+                    x.put("original-trace", traceString);
+                    y.put("trace variants", x);
+                    dataset.put(String.format("%d-%d", index, b.buffersize), y);
+                }
+                index++;
+            }
+        }
+        Files.write(Paths.get("./json/", "traces.json"), Collections.singleton(dataset.toString()));
+    }
+
+    public static String createTraceString(List<SplayNet.CommunicatingNodes> list){
+        StringBuilder traceString = new StringBuilder("[");
+        for (SplayNet.CommunicatingNodes pair: list){
+            traceString.append(String.format("('%d', '%d'), ", pair.getU(), pair.getV()));
+        }
+        traceString.delete(traceString.length()-2, traceString.length());
+        traceString.append("]");
+        return traceString.toString();
     }
 }

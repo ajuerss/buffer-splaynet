@@ -13,37 +13,6 @@ import java.util.Map;
 import java.util.Objects;
 
 public class Part_Graph {
-    public static void main(String[] args) throws Exception {
-        ArrayList<Buffer.BufferNodePair> p = new ArrayList<>();
-        p.add(new Buffer.BufferNodePair(new SplayNet.CommunicatingNodes(1, 2, 3)));
-        p.add(new Buffer.BufferNodePair(new SplayNet.CommunicatingNodes(1, 2, 3)));
-        p.add(new Buffer.BufferNodePair(new SplayNet.CommunicatingNodes(1, 1, 4)));
-        p.add(new Buffer.BufferNodePair(new SplayNet.CommunicatingNodes(1, 3, 4)));
-        p.add(new Buffer.BufferNodePair(new SplayNet.CommunicatingNodes(1, 2, 1)));
-
-        for(Buffer.BufferNodePair element: p){
-            System.out.print(element.getU() + "-" + element.getV() + ";");
-        }
-        System.out.println();
-        for(ArrayList<Buffer.BufferNodePair> j: call_part_graph(p, 4, true)){
-            for(Buffer.BufferNodePair element: j){
-                System.out.print(element.getU() + "-" + element.getV() + ";");
-            }
-            System.out.println();
-        }
-        /*for (int k = 0; k<10;k++) {
-            long start = System.nanoTime();
-            double elapsedTime = (double) (System.nanoTime() - start) / 1_000_000_000;
-            System.out.println("Ohne Parser: " + elapsedTime);
-
-            long start1 = System.nanoTime();
-            for (int i = 0; i < 100; i++) {
-                call_python_script();
-            }
-            double elapsedTime1 = (double) (System.nanoTime() - start1) / 1_000_000_000;
-            System.out.println("Mit Parser: " + elapsedTime1);
-        }*/
-    }
 
     public static void writeInJSON(ArrayList<ArrayList<Integer>> matrix, double maxComponentSize) throws Exception {
 
@@ -63,7 +32,7 @@ public class Part_Graph {
         Files.write(Paths.get("./json/", "input.json"), data.toJSONString().getBytes());
     }
 
-    public static ArrayList<ArrayList<Buffer.BufferNodePair>> call_part_graph(ArrayList<Buffer.BufferNodePair> list, double maxComponentSize, boolean printLogs) throws Exception {
+    public static ArrayList<ArrayList<Buffer.BufferNodePair>> call_part_graph(ArrayList<Buffer.BufferNodePair> list, double maxComponentSize) throws Exception {
         ArrayList<ArrayList<Buffer.BufferNodePair>> newList = new ArrayList<>();
 
         Map<Integer, Integer> dic = new HashMap<Integer, Integer>();
@@ -106,12 +75,11 @@ public class Part_Graph {
                 }
             }
         }
-        if (printLogs){
-            for(ArrayList<Integer> x: newComponentsNodes){
-                System.out.println(x);
-            }
+        /*
+        for(ArrayList<Integer> x: newComponentsNodes){
+            MainBufferSplayNet.printLogs(String.valueOf(x));
         }
-
+        */
         for(ArrayList<Integer> element: newComponentsNodes){
             ArrayList<Buffer.BufferNodePair> newComponent = new ArrayList<>();
             ArrayList<Buffer.BufferNodePair> found = new ArrayList<>();
@@ -124,17 +92,15 @@ public class Part_Graph {
             list.removeAll(found);
             newList.add(newComponent);
         }
-
-        if (printLogs){
-            System.out.println("new cluster");
-            for(ArrayList<Buffer.BufferNodePair> j: newList){
-                for(Buffer.BufferNodePair element: j){
-                    System.out.print(element.getU() + "-" + element.getV() + ";");
-                }
-                System.out.println();
+        /*
+        MainBufferSplayNet.printLogs("new cluster");
+        for(ArrayList<Buffer.BufferNodePair> j: newList){
+            for(Buffer.BufferNodePair element: j){
+                MainBufferSplayNet.printLogs(element.getU() + "-" + element.getV() + ";");
             }
+            MainBufferSplayNet.printLogs("");
         }
-
+        */
         ArrayList<Buffer.BufferNodePair> found = new ArrayList<>();
         for(Buffer.BufferNodePair element: list){
             boolean foundU = false;
@@ -176,16 +142,14 @@ public class Part_Graph {
         list.removeAll(found);
         if (list.size() > 0) throw new Exception("this.listBufferNodePairs bigger than one");
 
-        if (printLogs){
-            System.out.println("final cluster");
-            for(ArrayList<Buffer.BufferNodePair> j: newList){
-                for(Buffer.BufferNodePair element: j){
-                    System.out.print(element.getU() + "-" + element.getV() + ";");
-                }
-                System.out.println();
-            }
-        }
         /*
+        MainBufferSplayNet.printLogs("final cluster");
+        for(ArrayList<Buffer.BufferNodePair> j: newList){
+            for(Buffer.BufferNodePair element: j){
+                MainBufferSplayNet.printLogs(element.getU() + "-" + element.getV() + ";");
+            }
+            MainBufferSplayNet.printLogs("");
+        }
         for (ArrayList<Buffer.BufferNodePair> element: newList){
             if (element.size() <= 0){
                 throw new Exception("leere liste wird hinzugefügt");
