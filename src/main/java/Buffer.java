@@ -1,15 +1,18 @@
 import org.jgrapht.alg.clustering.KSpanningTreeClustering;
 import org.jgrapht.graph.DefaultEdge;
 import org.jgrapht.graph.SimpleGraph;
-
 import java.util.*;
 import java.util.stream.Collectors;
+import static java.lang.Math.sqrt;
 
+/***************************************************************************
+ * Buffer Class.
+ * => This class implements the buffer and its priority algorithms.
+ * **********************************************************************/
 public class Buffer {
     private final SplayNet usedNet;
     private final int bufferSize;
-    private List<SplayNet.CommunicatingNodes> traceOrder = new ArrayList<>();
-
+    private final List<SplayNet.CommunicatingNodes> traceOrder = new ArrayList<>();
     private List<BufferNodePair> listBufferNodePairs = new ArrayList<>();
     private List<RequestCount> edgeListCounted = new ArrayList<>();
     ArrayList<ArrayList<BufferNodePair>> edgeList = new ArrayList<>();
@@ -35,7 +38,6 @@ public class Buffer {
         private final int u;
         private final int v;
         private int count = 1;
-
         private int distance;
 
         public RequestCount(int u, int v, int distance){
@@ -48,18 +50,20 @@ public class Buffer {
         public int getDistance(){ return this.distance;}
 
     }
-
+    /***************************************************************************
+     * Buffer Item.
+     * => This class contains the information regarding one Request in the buffer
+     * => Information about the node pair, its distance and timestamp is given
+     * **********************************************************************/
     public static class BufferNodePair{
         SplayNet.CommunicatingNodes nodePair;
         private int distance;
         private double priority;
         private int timestamp;
-
         public BufferNodePair(SplayNet.CommunicatingNodes commNodes){
             this.nodePair = commNodes;
             this.timestamp = 0;
         }
-
         public int getU(){
             return this.nodePair.getU();
         }
@@ -69,16 +73,10 @@ public class Buffer {
         public double getPriority() {
             return this.priority;
         }
-
         public SplayNet.CommunicatingNodes getNodePair(){ return this.nodePair;}
-
         public int getDistance() {
             return this.distance;
         }
-        public void setPriority(int k) { this.priority = k; }
-        public int getTimestamp() { return this.timestamp; }
-        public void setTimestamp(int k) { this.timestamp = k; }
-
     }
     public void increaseTimestamp(){
         if (listBufferNodePairs == null) return;
@@ -86,20 +84,24 @@ public class Buffer {
             element.timestamp++;
         }
     }
-
+    /***************************************************************************
+     * Calculate Priority of Buffer Queue.
+     * => This function calculates the priority of each request in the buffer
+     * => If a request is optimal, it is immediately served.
+     * => The calculation of priority: Priority = distance - starvationParameter * Timestamp
+     * **********************************************************************/
     public boolean calcPriority() throws Exception {
         boolean fullBuffer = true;
         ArrayList<BufferNodePair> servedElements = new ArrayList<>();
         for (BufferNodePair element: listBufferNodePairs){
             if (element.distance == 0){
-                element.distance = usedNet.calculateDistance((listBufferNodePairs.size() == 1), element.nodePair.getU(), element.nodePair.getV());
+                element.distance = usedNet.calculateDistance(element.nodePair.getU(), element.nodePair.getV());
             }
             element.priority = element.distance - MainBufferSplayNet.starvationParameter*element.timestamp;
             if (element.distance == 1){
                 fullBuffer = false;
-                MainBufferSplayNet.printLogs(String.format("%d and %d with dist 1 served\n", element.nodePair.getU(), element.nodePair.getV()));
                 servedElements.add(element);
-                this.modifiedTraceOrderAdd(new SplayNet.CommunicatingNodes(0,element.getU(), element.getV()));
+                if (MainBufferSplayNet.monitoreTraceOrder) this.modifiedTraceOrderAdd(new SplayNet.CommunicatingNodes(0,element.getU(), element.getV()));
                 this.usedNet.setTimestamps(element.getNodePair().getId(), MainBufferSplayNet.timestamp++);
             }
         }
@@ -111,7 +113,11 @@ public class Buffer {
         }
         return fullBuffer;
     }
-
+    /***************************************************************************
+     * Helper Function
+     * => Given the 4 subtrees of changed distances in a rotation, this function assignes each
+     *      node u and v the subtree is lies in.
+     * **********************************************************************/
     public int[] assignGroup(int u, int v, int[] a, int[] b,int[] c){
         int uGroup;
         int vGroup;
@@ -137,7 +143,13 @@ public class Buffer {
 
         return new int[]{uGroup, vGroup};
     }
-
+    /***************************************************************************
+     * Update Distances in Buffer Function.
+     * => After a rotation is performed, the distance of node pairs need to be updates
+     *      which lie in different of the 4 subtrees
+     * => Since different Buffer queues exist depending on the prioritization algorithm, each
+     *      priority queue is updated.
+     * **********************************************************************/
     public void updateDistances(int[] a, int[] b,int[] c) throws Exception {
         for (BufferNodePair element: this.listBufferNodePairs){
             int[] values = assignGroup(element.nodePair.getU(), element.nodePair.getV(), a, b, c);
@@ -145,36 +157,27 @@ public class Buffer {
             int vGroup = values[1];
 
             if (element.distance == 0) throw new Exception("listBufferNodePairs: distance not calculated but updated");
-
             if ((uGroup == 1 && vGroup == 3) || (uGroup == 3 && vGroup == 1) ||
                     (uGroup == 2 && vGroup == 4) || (uGroup == 4 && vGroup == 2)){
                 element.distance++;
-                //System.out.println("Dist von " + u + " und " + v + " um 1 erhöhrt mit " + uGroup + " und " + vGroup);
             }
             if ((uGroup == 1 && vGroup == 4) || (uGroup == 4 && vGroup == 1) ||
                     (uGroup == 2 && vGroup == 3) || (uGroup == 3 && vGroup == 2)){
                 element.distance--;
-                //System.out.println("Dist von " + u + " und " + v + " um 1 verringert mit " + uGroup + " und " + vGroup);
-
-
             }
         }
         for (RequestCount element: this.edgeListCounted){
             int[] values = assignGroup(element.u, element.v, a, b, c);
             int uGroup = values[0];
             int vGroup = values[1];
-
             if (element.distance == 0) throw new Exception("edgelistcounted: distance not calculated but updated");
-
             if ((uGroup == 1 && vGroup == 3) || (uGroup == 3 && vGroup == 1) ||
                     (uGroup == 2 && vGroup == 4) || (uGroup == 4 && vGroup == 2)){
                 element.distance++;
-                //System.out.println("Dist von " + u + " und " + v + " um 1 erhöhrt mit " + uGroup + " und " + vGroup);
             }
             if ((uGroup == 1 && vGroup == 4) || (uGroup == 4 && vGroup == 1) ||
                     (uGroup == 2 && vGroup == 3) || (uGroup == 3 && vGroup == 2)){
                 element.distance--;
-                //System.out.println("Dist von " + u + " und " + v + " um 1 verringert mit " + uGroup + " und " + vGroup);
             }
         }
         for (ArrayList<BufferNodePair> cluster: this.edgeList){
@@ -182,18 +185,14 @@ public class Buffer {
                 int[] values = assignGroup(element.nodePair.getU(), element.nodePair.getV(), a, b, c);
                 int uGroup = values[0];
                 int vGroup = values[1];
-
                 if (element.distance == 0) throw new Exception("edgelist: distance not calculated but updated");
-
                 if ((uGroup == 1 && vGroup == 3) || (uGroup == 3 && vGroup == 1) ||
                         (uGroup == 2 && vGroup == 4) || (uGroup == 4 && vGroup == 2)){
                     element.distance++;
-                    //System.out.println("Dist von " + u + " und " + v + " um 1 erhöhrt mit " + uGroup + " und " + vGroup);
                 }
                 if ((uGroup == 1 && vGroup == 4) || (uGroup == 4 && vGroup == 1) ||
                         (uGroup == 2 && vGroup == 3) || (uGroup == 3 && vGroup == 2)){
                     element.distance--;
-                    //System.out.println("Dist von " + u + " und " + v + " um 1 verringert mit " + uGroup + " und " + vGroup);
                 }
             }
         }
@@ -203,33 +202,19 @@ public class Buffer {
     private boolean inBetween(int number, int lowerBound, int upperBound){
         return number >= lowerBound && number <= upperBound;
     }
-
     public void sortByPriority(){
         this.listBufferNodePairs = this.listBufferNodePairs.stream()
                 .sorted(Comparator.comparing(BufferNodePair::getPriority))
                 .collect(Collectors.toList());
     }
-    /*
-    public boolean calcDistance() throws Exception {
-        boolean fullBuffer = true;
-        ArrayList<BufferNodePair> servedElements = new ArrayList<>();
-        for (BufferNodePair element: listBufferNodePairs){
-            if (element.distance == 0){
-                element.distance = usedNet.calculateDistance((listBufferNodePairs.size() == 1), element.nodePair.getU(), element.nodePair.getV());
-            }
-            if (element.distance == 1){
-                fullBuffer = false;
-                MainBufferSplayNet.printLogs(String.format("%d and %d with dist 1 served\n", element.nodePair.getU(), element.nodePair.getV()));
-                this.usedNet.increaseServingCost(1);
-                this.usedNet.setTimestamps(element.getNodePair().getId(), MainBufferSplayNet.timestamp++);
-                servedElements.add(element);
-            }
-        }
-        this.listBufferNodePairs.removeAll(servedElements);
-        return fullBuffer;
-    }
-     */
-
+    /***************************************************************************
+     * Cluster Function
+     * => Input is the algorithm according to which is the buffer reordered
+     * => First the Buffer queue is clustered
+     * => If a cluster is too large, it is partitioned
+     * => Then the requests in a cluster are grouped and then the groups are reordered
+     * => Then each request group is served
+     * **********************************************************************/
     public void startClustering(int algorithm) throws Exception {
         ArrayList<ArrayList<Integer>> components = getClusters(this.listBufferNodePairs);
         for(ArrayList<Integer> element: components){
@@ -244,12 +229,11 @@ public class Buffer {
                 }
                 this.listBufferNodePairs.removeAll(found);
             }
+
             double n = this.usedNet.getNumberNodes();
-            double a = 0.01;
-            double factor = ((2*n-4)/(((n*n-n)/2)-1))/a;
-            double maxComponentSize = factor*n;
+            double a = 3;
+            double maxComponentSize = a*sqrt(n);
             if(element.size() > maxComponentSize){
-                MainBufferSplayNet.printLogs("partitioning component");
                 this.usedNet.clusters++;
                 this.usedNet.partitions++;
                 this.edgeList.addAll(Part_Graph.call_part_graph(newComponent, maxComponentSize));
@@ -297,22 +281,29 @@ public class Buffer {
         this.edgeList.clear();
 
     }
-
+    /***************************************************************************
+     * Prioritization by Distance
+     * => Reorders the buffer queue based the distance of requests. Smallest distance first.
+     * **********************************************************************/
     public void prioritizeInClustersDistance() throws Exception {
         this.edgeListCounted = this.edgeListCounted.stream()
                 .sorted(Comparator.comparing(RequestCount::getDistance))
                 .collect(Collectors.toList());
         for (RequestCount request: this.edgeListCounted){
-            MainBufferSplayNet.printLogs(String.format("Request %d-%d with distance %d, %d times\n", request.u, request.v, request.distance, request.count));
             this.usedNet.increaseServingCost(request.distance);
             if (request.count > 1) this.usedNet.increaseServingCost(request.count-1);
-            for(int a = 0; a < request.count; a++){
-                this.modifiedTraceOrderAdd(new SplayNet.CommunicatingNodes(0,request.u, request.v));
+            if (MainBufferSplayNet.monitoreTraceOrder){
+                for(int a = 0; a < request.count; a++){
+                    this.modifiedTraceOrderAdd(new SplayNet.CommunicatingNodes(0,request.u, request.v));
+                }
             }
             this.usedNet.commute(request.u, request.v);
         }
     }
-
+    /***************************************************************************
+     * Prioritization Sequential
+     * => Reorders the buffer queue based on routing sequential in the tree.
+     * **********************************************************************/
     public void prioritizeInClustersNodeByNode() throws Exception {
         int node = this.edgeListCounted.get(0).u;
         while(this.edgeListCounted.size() != 0){
@@ -325,11 +316,12 @@ public class Buffer {
                     }else{
                         nextNode = request.u;
                     }
-                    MainBufferSplayNet.printLogs(String.format("Request %d-%d with distance %d, %d times\n", request.u, request.v, request.distance, request.count));
                     this.usedNet.increaseServingCost(request.distance);
                     if (request.count > 1) this.usedNet.increaseServingCost(request.count-1);
-                    for(int a = 0; a < request.count; a++){
-                        this.modifiedTraceOrderAdd(new SplayNet.CommunicatingNodes(0,request.u, request.v));
+                    if (MainBufferSplayNet.monitoreTraceOrder){
+                        for(int a = 0; a < request.count; a++){
+                            this.modifiedTraceOrderAdd(new SplayNet.CommunicatingNodes(0,request.u, request.v));
+                        }
                     }
                     this.usedNet.commute(request.u, request.v);
                     servedNodes.add(request);
@@ -344,18 +336,22 @@ public class Buffer {
             }
         }
     }
-
+    /***************************************************************************
+     * Prioritization of Frequency
+     * => Reorders the buffer depending on the number of occurences. Highest frequency first.
+     * **********************************************************************/
     public void prioritizeInClustersEdgeWeight() throws Exception {
         this.edgeListCounted = this.edgeListCounted.stream()
                 .sorted(Comparator.comparing(RequestCount::getCount))
                 .collect(Collectors.toList());
         Collections.reverse(this.edgeListCounted);
         for (RequestCount request: this.edgeListCounted){
-            MainBufferSplayNet.printLogs(String.format("Request %d-%d with distance %d, %d times\n", request.u, request.v, request.distance, request.count));
             this.usedNet.increaseServingCost(request.distance);
             if (request.count > 1) this.usedNet.increaseServingCost(request.count-1);
-            for(int a = 0; a < request.count; a++){
-                this.modifiedTraceOrderAdd(new SplayNet.CommunicatingNodes(0,request.u, request.v));
+            if (MainBufferSplayNet.monitoreTraceOrder){
+                for(int a = 0; a < request.count; a++){
+                    this.modifiedTraceOrderAdd(new SplayNet.CommunicatingNodes(0,request.u, request.v));
+                }
             }
             this.usedNet.commute(request.u, request.v);
         }
@@ -369,7 +365,11 @@ public class Buffer {
         Collections.reverse(list);
         return list;
     }
-
+    /***************************************************************************
+     * Helper Function
+     * => Given a list of requests (demand graph) this function identifies connected components
+     *      and returns them together.
+     * **********************************************************************/
     public static ArrayList<ArrayList<Integer>> getClusters(List<BufferNodePair> edges){
         SimpleGraph<String, DefaultEdge> graph = new SimpleGraph<String, DefaultEdge>(DefaultEdge.class);
         for (BufferNodePair element: edges){
@@ -379,10 +379,8 @@ public class Buffer {
             graph.addVertex(node2);
             graph.addEdge(node1, node2);
         }
-        MainBufferSplayNet.printLogs("start clust");
         KSpanningTreeClustering<String, DefaultEdge> cluster = new KSpanningTreeClustering<>(graph, 1);
         List<Set<String>> x = cluster.getClustering().getClusters();
-        MainBufferSplayNet.printLogs(String.valueOf(x));
         ArrayList<ArrayList<Integer>> intClust = new ArrayList<>();
         for (Set<String> element: x){
             ArrayList<Integer> arr = new ArrayList<>();
@@ -393,5 +391,4 @@ public class Buffer {
         }
         return intClust;
     }
-
 }

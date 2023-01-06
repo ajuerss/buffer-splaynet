@@ -3,33 +3,23 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
+/***************************************************************************
+ *  Class of SplayNet
+ **************************************************************************/
 public class SplayNet {
-
     private Node root;   // root of the BST
     private long serviceCost = 0;
-    private long routingCost = 0;
     private long rotationCost = 0;
-
     private long[] timestamps;
-
     private long executionTime;
     private int numberNodes = 0;
-
     public int partitions = 0;
     public int clusters = 0;
     private Buffer buffer;
-
     private boolean insertionOver = false;
-
-
     public int getNumberNodes(){ return this.numberNodes; }
-
-    public long getTimestamp(int idx){ return this.timestamps[idx]; }
-
     public long[] getAllTimestamps(){ return this.timestamps;}
-
     public long getExecutionTime(){ return this.executionTime;}
-
     public void setNumberNodes(int number){
         this.numberNodes = number;
     }
@@ -40,37 +30,18 @@ public class SplayNet {
     public void setInsertionOver(){
         this.insertionOver = true;
     }
-
-    public void resetCostCounter() {
-        this.serviceCost = 0;
-        this.routingCost = 0;
-        this.rotationCost = 0;
-    }
-
     public Node getRoot(){
         return this.root;
     }
-
     public long getRotationCost(){
         return this.rotationCost;
     }
-
-    public void increaseRotationCost(int cost){
-        if (insertionOver) this.rotationCost += cost;
-    }
-
-    public long getRoutingCost(){
-        return this.routingCost;
-    }
-
-    public void increaseRoutingCost(int cost){
-        if (insertionOver) this.routingCost += cost;
-    }
-
     public long getServiceCost(){
         return this.serviceCost;
     }
-
+    public void increaseRotationCost(int cost){
+        if (insertionOver) this.rotationCost += cost;
+    }
     public void increaseServingCost(int cost) throws Exception {
         if (cost < 0) throw new Exception("distance < 0");
         if (cost == 0) throw new Exception("distance = 0");
@@ -78,35 +49,25 @@ public class SplayNet {
     }
 
     public void setBuffer(Buffer buffer) {this.buffer = buffer; }
-
-    public Buffer getBuffer(){ return this.buffer;}
-
     public static class Node {
         private final int key;
         private Node parent, left, right;
-
-        private int lastLeftParent = 0;
-
+        private int lastLeftParent = 0;         // each node is initialized with max/min last right/left ancestor
         private int lastRightParent = Integer.MAX_VALUE;
-
         public Node(int key) {
             this.key = key;
         }
-
         public int getKey(){
             return this.key;
         }
-
         public Node getLeft(){
             return this.left;
         }
-
         public Node getRight(){
             return this.right;
         }
         public Node getParent(){ return this.parent; }
     }
-
     public static class CommunicatingNodes {
         private final int id;
         private final int u;
@@ -127,7 +88,11 @@ public class SplayNet {
             return this.v;
         }
     }
-    public int calculateDistance(boolean noBuffer, int u, int v){
+    /***************************************************************************
+     *  Distance calculation function.
+     *  => Given two node keys, this function calculates its distance
+     **************************************************************************/
+    public int calculateDistance(int u, int v){
         Node node = this.root;
         Node common_ancestor;
         int distance = 0;
@@ -159,14 +124,13 @@ public class SplayNet {
             }
             distance++;
         }
-        if (!noBuffer) this.increaseRoutingCost(distance);
         return distance;
     }
     /***************************************************************************
      *  Splay tree insertion.
-     *  => Insert a node in the tree with key ='key'
-     *  => Note: New node is always inserted at the root
-     *         : This function does nothing if key already exists
+     *  => Input is a list of nodes which construct the network
+     *  => We creates a balanced BST based on the input
+     *  => With recursion we create the BST from bottom to top via "insertionIteration()"
      ***************************************************************************/
     public void insertBalancedBST(ArrayList<Integer> nodeList) {
         Collections.sort(nodeList);
@@ -175,33 +139,6 @@ public class SplayNet {
         this.root.left = insertionIteration(nodeList.subList(0,k), this.root);
         this.root.right = insertionIteration(nodeList.subList(k+1,nodeList.size()), this.root);
     }
-
-    public void assignLastParents(Node node, int left, int right){
-        if (node != null){
-            node.lastLeftParent = left;
-            node.lastRightParent = right;
-            assignLastParents(node.left, left, node.key);
-            assignLastParents(node.right, node.key, right);
-        }
-    }
-
-    public void checkLastParents(Node node, int left, int right) throws Exception {
-        if (node != null){
-            if (!(node.lastRightParent == right)){
-                System.out.printf("Node %d has lastRightParent %d, but should have %d", node.getKey(), node.lastRightParent, right);
-                this.printPreorder(this.root);
-                throw new Exception("last parents wrong");
-            }
-            if (!(node.lastLeftParent == left)){
-                System.out.printf("Node %d has lastLeftParent %d, but should have %d\n", node.getKey(), node.lastLeftParent, left);
-                this.printPreorder(this.root);
-                throw new Exception("last parents wrong");
-            }
-            assignLastParents(node.left, left, node.key);
-            assignLastParents(node.right, node.key, right);
-        }
-    }
-
     public Node insertionIteration (List<Integer> nodeList, Node parent){
         if (nodeList.isEmpty()) return null;
         int k = nodeList.size()/2;
@@ -212,9 +149,23 @@ public class SplayNet {
         return newNode;
     }
     /***************************************************************************
+     *  Last right/left ancestor assignment.
+     *  => This function recursivly assigns each node in the network its last left and right ancestor
+     *  => For the children of the passed node, the same function is called
+     *  => The recursion ends as the passed node has no children
+     ***************************************************************************/
+    public void assignLastParents(Node node, int left, int right){
+        if (node != null){
+            node.lastLeftParent = left;
+            node.lastRightParent = right;
+            assignLastParents(node.left, left, node.key);
+            assignLastParents(node.right, node.key, right);
+        }
+    }
+    /***************************************************************************
      *  SplayNet function
      *  => This function communicates between two inputs key u and key v.
-     *  => By the end of excution of this function bith u and v are splayed to their common ancestor
+     *  => By the end of excution of this function both u and v are splayed to their common ancestor
      ***************************************************************************/
     public void commute (int u, int v) throws Exception
     {
@@ -244,12 +195,14 @@ public class SplayNet {
         if (uNode < vNode) {
             splay_new(newLCA.right, vNode);
         }
-        //this.increaseRoutingCost(1);
     }
-
+    /***************************************************************************
+     *  Find Lowest Common Ancestor
+     *  => This function finds, given 2 node id's, the lowest common ancestor
+     *  => By routing top-down in the, the node which contains each search node in a different subtree is the LCA
+     ***************************************************************************/
     public Node findLCA (int u, int v){
         Node node = this.root;
-        int cost = 0;
         while (node != null && ((u > node.key && v > node.key) || (u < node.key && v < node.key))) {
             if (u > node.key)
             {
@@ -257,39 +210,35 @@ public class SplayNet {
             } else {
                 node = node.left;
             }
-            cost++;
         }
         assert node != null;
-        //this.increaseRoutingCost(cost);
         return node;
     }
-
-
     /***************************************************************************
-     * Splay tree function.
-     * =>splay key in the tree rooted at Node h.
-     * =>If a node with that key exists, it is splayed to the root of the tree.
-     * => If it does not, the last node along the search path for the key is splayed to the root.
+     * Splay search tree function.
+     * => This function searches from the node "h" to find the node with "key"
+     * => If found, the Splay_up function is called
      * **********************************************************************/
     private Node splay_new(Node h, int key) throws Exception {
         if (h == null) throw new Exception("Node in Splay() does not exist");
         Node node = h;
-        int cost = 0;
         while (node != null){
             if (node.getKey() > key){
                 node = node.left;
-                cost++;
             }else if (node.getKey() < key){
                 node = node.right;
-                cost++;
             }else if (node.getKey() == key){
-                //this.increaseRoutingCost(cost);
                 splay_up(h, node);
                 return node;
             }
         }
         throw new Exception("Node in Splay() not found");
     }
+    /***************************************************************************
+     * Splay tree function.
+     * => This function splay the node "k" to the position of node "h"
+     * => Until "k" is at the position of "h", "k" is rotated up in the tree
+     * **********************************************************************/
     private Node splay_up(Node h, Node k) throws Exception {
         if (h == k){
             return k;
@@ -329,12 +278,13 @@ public class SplayNet {
         }
         return splay_up(h,k);
     }
-
     /***************************************************************************
-     *  Helper functions.
-     ***************************************************************************/
-
-    // right rotate
+     * Rotate right function.
+     * => Given a node "h", this function rotates the subtree to the right.
+     * => The created costs are added to the rotation costs of the network.
+     * => The information about last right/left ancestor is adjusted.
+     * => The function to update the distances in the buffer is called.
+     * **********************************************************************/
     private Node rotateRight (Node h) throws Exception {
         if (h.left == null) throw new Exception("kein linkes kind bei rechtsrotation");
         Node x = h.left;
@@ -375,8 +325,13 @@ public class SplayNet {
 
         return x;
     }
-
-    // left rotate
+    /***************************************************************************
+     * Rotate left function.
+     * => Given a node "h", this function rotates the subtree to the left.
+     * => The created costs are added to the rotation costs of the network.
+     * => The information about last right/left ancestor is adjusted.
+     * => The function to update the distances in the buffer is called.
+     * **********************************************************************/
     private Node rotateLeft (Node h) throws Exception {
         if (h.right == null) throw new Exception("kein rechtes kind bei linksrotation");
         Node x = h.right;
@@ -416,7 +371,11 @@ public class SplayNet {
 
         return x;
     }
-
+    /***************************************************************************
+     * Helper function
+     * => This functions prints the preorder of nodes of which you can construct the tree.
+     * => Only useful for small trees.
+     * **********************************************************************/
     public void printPreorder (Node node){
         if(MainBufferSplayNet.log){
             if (node == null) {
@@ -433,46 +392,4 @@ public class SplayNet {
             printPreorder(node.right);
         }
     }
-
-    private Node splay (Node h, int key) throws Exception {
-        if (h == null) throw new Exception("Node in Splay() does not exist");
-
-        int cmp1 = key - h.key;
-        if (cmp1 < 0) {
-            if (h.left == null) throw new Exception("Key not in tree");
-            int cmp2 = key - h.left.key;
-            this.increaseRoutingCost(1);
-            //System.out.printf("First iteration in splay +1 for %d\n", h.getKey());
-            if (cmp2 < 0) {     //Left-left case => 2 times right rotate
-                if (h.left.left == null) throw new Exception("Key not in tree");
-                this.increaseRoutingCost(1);
-                h.left.left = splay(h.left.left, key);
-                h = rotateRight(h); //Right rotate
-            } else if (cmp2 > 0) {//Left-Right case => Right rotate then Left rotate
-                h.left.right = splay(h.left.right, key);
-                this.increaseRoutingCost(1);
-                if (h.left.right != null)
-                    h.left = rotateLeft(h.left); //Left rotate
-            }
-
-            return rotateRight(h);   //Right Rotate
-        } else if (cmp1 > 0) {
-            if (h.right == null) throw new Exception("Key not in tree");
-            int cmp2 = key - h.right.key;
-            this.increaseRoutingCost(1);
-            if (cmp2 < 0) {             //Right-Left case
-                h.right.left = splay(h.right.left, key);
-                this.increaseRoutingCost(1);
-                if (h.right.left != null)
-                    h.right = rotateRight(h.right);  //Right Rotate
-            } else if (cmp2 > 0) {        //Right-Right case
-                h.right.right = splay(h.right.right, key);
-                this.increaseRoutingCost(1);
-                h = rotateLeft(h);      //Left rotate
-            }
-            return rotateLeft(h);   //Left rotate
-        } else return h;
-    }
-
-
 }

@@ -12,14 +12,16 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
+/* This class partitions a too large cluster into smaller components */
 public class Part_Graph {
-
+    /***************************************************************************
+     *  JSON Writer for component.
+     *  => This class writes in the input.json the edge array, which represents the
+     *      directed weighted graph (cluster)
+     **************************************************************************/
     public static void writeInJSON(ArrayList<ArrayList<Integer>> matrix, double maxComponentSize) throws Exception {
-
-
         JSONObject data = new JSONObject();
         data.put("maxComponentSize", (int)maxComponentSize);
-
         JSONArray m = new JSONArray();
         for(ArrayList<Integer> element: matrix){
             JSONArray array = new JSONArray();
@@ -31,7 +33,16 @@ public class Part_Graph {
         data.put("array", m);
         Files.write(Paths.get("./json/", "input.json"), data.toJSONString().getBytes());
     }
-
+    /***************************************************************************
+     *  Partition Graph Function.
+     *  => Based on a list of communication requests, this class maps them into an edge array, which
+     *        is then passed to the python script
+     *  => The python script partitions the graph  with the louvain method and returns an array of nodes with a cluster assigned
+     *  => This array is read and each request gets assigned to the corresponding cluster
+     *  => If a request belong to two clusters (each node is in a different cluster), the request gets assigned
+     *        to the cluster, which includes more requests of the respective node
+     *  => A List of components is returned
+     **************************************************************************/
     public static ArrayList<ArrayList<Buffer.BufferNodePair>> call_part_graph(ArrayList<Buffer.BufferNodePair> list, double maxComponentSize) throws Exception {
         ArrayList<ArrayList<Buffer.BufferNodePair>> newList = new ArrayList<>();
 
@@ -75,11 +86,6 @@ public class Part_Graph {
                 }
             }
         }
-        /*
-        for(ArrayList<Integer> x: newComponentsNodes){
-            MainBufferSplayNet.printLogs(String.valueOf(x));
-        }
-        */
         for(ArrayList<Integer> element: newComponentsNodes){
             ArrayList<Buffer.BufferNodePair> newComponent = new ArrayList<>();
             ArrayList<Buffer.BufferNodePair> found = new ArrayList<>();
@@ -92,15 +98,6 @@ public class Part_Graph {
             list.removeAll(found);
             newList.add(newComponent);
         }
-        /*
-        MainBufferSplayNet.printLogs("new cluster");
-        for(ArrayList<Buffer.BufferNodePair> j: newList){
-            for(Buffer.BufferNodePair element: j){
-                MainBufferSplayNet.printLogs(element.getU() + "-" + element.getV() + ";");
-            }
-            MainBufferSplayNet.printLogs("");
-        }
-        */
         ArrayList<Buffer.BufferNodePair> found = new ArrayList<>();
         for(Buffer.BufferNodePair element: list){
             boolean foundU = false;
@@ -141,26 +138,7 @@ public class Part_Graph {
         }
         list.removeAll(found);
         if (list.size() > 0) throw new Exception("this.listBufferNodePairs bigger than one");
-
-        /*
-        MainBufferSplayNet.printLogs("final cluster");
-        for(ArrayList<Buffer.BufferNodePair> j: newList){
-            for(Buffer.BufferNodePair element: j){
-                MainBufferSplayNet.printLogs(element.getU() + "-" + element.getV() + ";");
-            }
-            MainBufferSplayNet.printLogs("");
-        }
-        for (ArrayList<Buffer.BufferNodePair> element: newList){
-            if (element.size() <= 0){
-                throw new Exception("leere liste wird hinzugefügt");
-            }
-        }
-        */
         return newList;
-    }
-
-    public static boolean containsNode(final ArrayList<Buffer.BufferNodePair> list, final int value){
-        return list.stream().anyMatch(o -> o.getU() == value) || list.stream().anyMatch(o -> o.getV() == value);
     }
 
     public static <T, E> T getKeyByValue(Map<T, E> map, E value) {
