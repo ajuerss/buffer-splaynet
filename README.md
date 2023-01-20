@@ -1,14 +1,17 @@
 # buffer-splaynet
 
-The structore for my thesis project was as follows: 
+The structure for my thesis project was as follows: 
 the main folder contained this project, a python 
 project and the results folder. The python project created
 datasets, plots and the complexity map. Therefore the 
-results are stored in a higher folder. The start the 
+results are stored in a higher folder. To start the
 experiment run the Main of MainBufferSplayNet.java. In
 the terminal the settings for the experiment are requested.
-It is possible to run the experiment normally to test one csv
-trace of input an own trace or start the experiment as simulation.
+The first question whether the experiment is a simulation or not.
+Simulations use all traces in the csvExperiment folder and have certain
+pre-settings (no logs, SP = 0.2, etc.). If the experiment is not a simulation
+the user can input an own trace via the console or use exactly one trace from
+the csvExperiment folder (the first trace is automatically used).
 The simulation setting is used for experimental evaluation. The 
 normal setting was also used to verify the correctness of the
 code and test own traces. For the experiments in my thesis the simulation
